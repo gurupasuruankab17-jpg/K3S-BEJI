@@ -1,0 +1,754 @@
+import React, { useState } from 'react';
+import { useAuth } from '../store/auth';
+import { Navigate } from 'react-router-dom';
+import { motion } from 'motion/react';
+import { mockEvents, Event, mockUserReports, mockResources, ResourceItem } from '../data/mockData';
+import { Plus, Edit2, Trash2, Users, FileText, Settings, Search, Calendar, X, CheckCircle2, XCircle, Download, Eye, Save, Building, Mail, Phone, User, Award, BookOpen } from 'lucide-react';
+
+// Mock Data for Users
+const mockUsers = [
+  { id: '1', name: 'Budi Santoso, M.Pd.', email: 'budi.santoso@belajar.id', role: 'Kepala Sekolah', school: 'SDN Beji 1', status: 'active' },
+  { id: '2', name: 'Siti Aminah, S.Pd.', email: 'siti.aminah@belajar.id', role: 'Guru Kelas', school: 'SDN Beji 2', status: 'active' },
+  { id: '3', name: 'Ahmad Fauzi, S.Pd.', email: 'ahmad.fauzi@belajar.id', role: 'Guru PJOK', school: 'SDN Beji 1', status: 'inactive' },
+  { id: '4', name: 'Rina Wati, M.Pd.', email: 'rina.wati@belajar.id', role: 'Kepala Sekolah', school: 'SDN Beji 3', status: 'active' },
+];
+
+export function AdminDashboard() {
+  const { user } = useAuth();
+  const [events, setEvents] = useState<Event[]>(mockEvents);
+  const [resources, setResources] = useState<ResourceItem[]>(mockResources);
+  const [activeTab, setActiveTab] = useState<'events' | 'users' | 'reports' | 'settings' | 'resources'>('events');
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [isAddingNew, setIsAddingNew] = useState(false);
+
+  // Settings State
+  const [settings, setSettings] = useState({
+    communityName: 'K3S Kecamatan Beji',
+    email: 'admin@k3sbeji.id',
+    phone: '+62 812-3456-7890',
+    publicRegistration: true,
+    autoCertificate: true,
+  });
+
+  if (!user || user.role !== 'admin') {
+    return <Navigate to="/login" replace />;
+  }
+
+  const handleSaveEvent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isAddingNew && editingEvent) {
+      setEvents([...events, { ...editingEvent, id: Date.now().toString() }]);
+      alert('Kegiatan baru berhasil ditambahkan!');
+    } else if (editingEvent) {
+      setEvents(events.map(ev => ev.id === editingEvent.id ? editingEvent : ev));
+      alert('Kegiatan berhasil diperbarui!');
+    }
+    setEditingEvent(null);
+    setIsAddingNew(false);
+  };
+
+  const handleDeleteEvent = (id: string) => {
+    if (window.confirm('Apakah Anda yakin ingin menghapus kegiatan ini?')) {
+      setEvents(events.filter(ev => ev.id !== id));
+    }
+  };
+
+  const handleAddNew = () => {
+    setIsAddingNew(true);
+    setEditingEvent({
+      id: '',
+      title: '',
+      description: '',
+      date: '',
+      status: 'upcoming',
+      image: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&q=80&w=800',
+      speaker: '',
+      location: '',
+      materialsLink: '',
+      attendanceLink: '',
+      submissionLink: '',
+      feedbackLink: '',
+      certificateLink: ''
+    });
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="flex flex-col md:flex-row gap-8">
+        
+        {/* Sidebar */}
+        <div className="w-full md:w-64 shrink-0">
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sticky top-24">
+            <div className="flex items-center space-x-4 mb-8 pb-6 border-b border-slate-100">
+              <img src={user.avatar} alt="Admin" className="w-14 h-14 rounded-full bg-slate-100 ring-4 ring-slate-50" />
+              <div>
+                <h3 className="font-bold text-slate-900 leading-tight">{user.name}</h3>
+                <p className="text-sm text-slate-500 mt-1">Administrator</p>
+              </div>
+            </div>
+            
+            <nav className="space-y-2">
+              <button 
+                onClick={() => setActiveTab('events')}
+                className={`w-full flex items-center space-x-3 px-4 py-3.5 rounded-2xl transition-all ${activeTab === 'events' ? 'bg-blue-50 text-blue-700 font-semibold shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+              >
+                <Calendar className={`w-5 h-5 ${activeTab === 'events' ? 'text-blue-600' : 'text-slate-400'}`} />
+                <span>Kelola Kegiatan</span>
+              </button>
+              <button 
+                onClick={() => setActiveTab('users')}
+                className={`w-full flex items-center space-x-3 px-4 py-3.5 rounded-2xl transition-all ${activeTab === 'users' ? 'bg-blue-50 text-blue-700 font-semibold shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+              >
+                <Users className={`w-5 h-5 ${activeTab === 'users' ? 'text-blue-600' : 'text-slate-400'}`} />
+                <span>Data Pengguna</span>
+              </button>
+              <button 
+                onClick={() => setActiveTab('reports')}
+                className={`w-full flex items-center space-x-3 px-4 py-3.5 rounded-2xl transition-all ${activeTab === 'reports' ? 'bg-blue-50 text-blue-700 font-semibold shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+              >
+                <FileText className={`w-5 h-5 ${activeTab === 'reports' ? 'text-blue-600' : 'text-slate-400'}`} />
+                <span className="text-left leading-tight">Laporan & Sertifikat</span>
+              </button>
+              <div className="pt-4 mt-4 border-t border-slate-100">
+                <button 
+                  onClick={() => setActiveTab('resources')}
+                  className={`w-full flex items-center space-x-3 px-4 py-3.5 rounded-2xl transition-all ${activeTab === 'resources' ? 'bg-blue-50 text-blue-700 font-semibold shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+                >
+                  <BookOpen className={`w-5 h-5 ${activeTab === 'resources' ? 'text-blue-600' : 'text-slate-400'}`} />
+                  <span className="text-left leading-tight">Perangkat Pembelajaran</span>
+                </button>
+                <button 
+                  onClick={() => setActiveTab('settings')}
+                  className={`w-full flex items-center space-x-3 px-4 py-3.5 rounded-2xl transition-all mt-2 ${activeTab === 'settings' ? 'bg-slate-800 text-white font-semibold shadow-md' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+                >
+                  <Settings className={`w-5 h-5 ${activeTab === 'settings' ? 'text-slate-300' : 'text-slate-400'}`} />
+                  <span>Pengaturan LMS</span>
+                </button>
+              </div>
+            </nav>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 min-w-0">
+          
+          {/* TAB: EVENTS */}
+          {activeTab === 'events' && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-8"
+            >
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Kelola Kegiatan</h2>
+                  <p className="text-slate-500 mt-1">Daftar praktik baik dan kegiatan komunitas</p>
+                </div>
+                <button 
+                  onClick={handleAddNew}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-sm hover:shadow-md flex items-center space-x-2 shrink-0"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>Tambah Kegiatan</span>
+                </button>
+              </div>
+
+              <div className="mb-6 relative">
+                <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Cari kegiatan berdasarkan judul atau narasumber..." 
+                  className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-slate-50 focus:bg-white"
+                />
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 text-sm">
+                      <th className="py-4 font-semibold px-6">Judul Kegiatan</th>
+                      <th className="py-4 font-semibold px-6">Tanggal</th>
+                      <th className="py-4 font-semibold px-6">Status</th>
+                      <th className="py-4 font-semibold px-6 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {events.map((event) => (
+                      <tr key={event.id} className="hover:bg-slate-50/50 transition-colors group bg-white">
+                        <td className="py-4 px-6">
+                          <div className="font-bold text-slate-900 line-clamp-1">{event.title}</div>
+                          <div className="text-sm text-slate-500 mt-1 flex items-center">
+                            <User className="w-3.5 h-3.5 mr-1" />
+                            {event.speaker}
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 text-slate-600 whitespace-nowrap text-sm">
+                          <div className="flex items-center">
+                            <Calendar className="w-4 h-4 mr-2 text-slate-400" />
+                            {event.date}
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                            event.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {event.status === 'completed' ? 'Selesai' : 'Akan Datang'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-right">
+                          <div className="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => {
+                                setIsAddingNew(false);
+                                setEditingEvent(event);
+                              }}
+                              className="p-2 text-blue-600 hover:bg-blue-100 rounded-xl transition-colors" 
+                              title="Edit"
+                            >
+                              <Edit2 className="w-4.5 h-4.5" />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteEvent(event.id)}
+                              className="p-2 text-red-600 hover:bg-red-100 rounded-xl transition-colors" 
+                              title="Hapus"
+                            >
+                              <Trash2 className="w-4.5 h-4.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+          )}
+
+          {/* TAB: USERS */}
+          {activeTab === 'users' && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-8"
+            >
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Data Pengguna</h2>
+                  <p className="text-slate-500 mt-1">Kelola anggota komunitas K3S Beji</p>
+                </div>
+                <button className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-5 py-2.5 rounded-xl font-medium transition-all shadow-sm flex items-center space-x-2 shrink-0">
+                  <Download className="w-5 h-5" />
+                  <span>Ekspor Data</span>
+                </button>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 text-sm">
+                      <th className="py-4 font-semibold px-6">Nama & Email</th>
+                      <th className="py-4 font-semibold px-6">Peran</th>
+                      <th className="py-4 font-semibold px-6">Instansi</th>
+                      <th className="py-4 font-semibold px-6">Status</th>
+                      <th className="py-4 font-semibold px-6 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {mockUsers.map((u) => (
+                      <tr key={u.id} className="hover:bg-slate-50/50 transition-colors bg-white">
+                        <td className="py-4 px-6">
+                          <div className="font-bold text-slate-900">{u.name}</div>
+                          <div className="text-sm text-slate-500 mt-1">{u.email}</div>
+                        </td>
+                        <td className="py-4 px-6 text-slate-700 text-sm font-medium">{u.role}</td>
+                        <td className="py-4 px-6 text-slate-600 text-sm">
+                          <div className="flex items-center">
+                            <Building className="w-4 h-4 mr-2 text-slate-400" />
+                            {u.school}
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          {u.status === 'active' ? (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
+                              <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Aktif
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
+                              <XCircle className="w-3.5 h-3.5 mr-1" /> Nonaktif
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-4 px-6 text-right">
+                          <button className="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors">
+                            Detail
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+          )}
+
+          {/* TAB: REPORTS */}
+          {activeTab === 'reports' && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-8"
+            >
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Laporan & Sertifikat</h2>
+                  <p className="text-slate-500 mt-1">Pantau kehadiran, tugas, dan penerbitan sertifikat</p>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                {events.filter(e => e.status === 'completed').map(event => (
+                  <div key={event.id} className="border border-slate-200 rounded-2xl p-6 hover:shadow-md transition-shadow bg-slate-50/50">
+                    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
+                      <div>
+                        <h3 className="font-bold text-lg text-slate-900">{event.title}</h3>
+                        <p className="text-sm text-slate-500 mt-1 flex items-center">
+                          <Calendar className="w-4 h-4 mr-1.5" /> {event.date}
+                        </p>
+                      </div>
+                      <div className="flex space-x-3">
+                        <button className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm flex items-center space-x-2">
+                          <Download className="w-4 h-4" />
+                          <span>Rekap Kehadiran</span>
+                        </button>
+                        <button 
+                          onClick={() => alert(`Sertifikat untuk kegiatan ${event.title} berhasil diterbitkan untuk peserta yang memenuhi syarat!`)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm flex items-center space-x-2"
+                        >
+                          <Award className="w-4 h-4" />
+                          <span>Terbitkan Sertifikat</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Mock Participants for this event */}
+                    <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
+                          <tr>
+                            <th className="py-3 px-4 font-semibold">Peserta</th>
+                            <th className="py-3 px-4 font-semibold text-center">Kehadiran</th>
+                            <th className="py-3 px-4 font-semibold text-center">Tugas</th>
+                            <th className="py-3 px-4 font-semibold text-center">Sertifikat</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          <tr>
+                            <td className="py-3 px-4 font-medium text-slate-900">Budi Santoso, M.Pd.</td>
+                            <td className="py-3 px-4 text-center"><CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto" /></td>
+                            <td className="py-3 px-4 text-center"><CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto" /></td>
+                            <td className="py-3 px-4 text-center"><span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md">Diterbitkan</span></td>
+                          </tr>
+                          <tr>
+                            <td className="py-3 px-4 font-medium text-slate-900">Siti Aminah, S.Pd.</td>
+                            <td className="py-3 px-4 text-center"><CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto" /></td>
+                            <td className="py-3 px-4 text-center"><XCircle className="w-5 h-5 text-red-400 mx-auto" /></td>
+                            <td className="py-3 px-4 text-center"><span className="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-md">Tertunda</span></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* TAB: RESOURCES */}
+          {activeTab === 'resources' && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-8"
+            >
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Perangkat Pembelajaran</h2>
+                  <p className="text-slate-500 mt-1">Kelola tautan unduhan modul ajar, modul kokurikuler, dan bank soal</p>
+                </div>
+                <button 
+                  onClick={() => alert('Tautan perangkat pembelajaran berhasil disimpan!')}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-medium transition-all shadow-sm flex items-center space-x-2 shrink-0"
+                >
+                  <Save className="w-5 h-5" />
+                  <span>Simpan Perubahan</span>
+                </button>
+              </div>
+
+              <div className="space-y-10">
+                {/* Modul Ajar */}
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center">
+                    <BookOpen className="w-5 h-5 mr-2 text-blue-600" /> Modul Ajar (Fase A - C)
+                  </h3>
+                  <div className="grid gap-4">
+                    {resources.filter(r => r.category === 'modul_ajar').map(item => (
+                      <div key={item.id} className="flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <div className="sm:w-1/3 font-semibold text-slate-700">{item.title}</div>
+                        <div className="sm:w-2/3">
+                          <input 
+                            type="url" 
+                            value={item.url}
+                            onChange={(e) => {
+                              const newResources = resources.map(r => r.id === item.id ? { ...r, url: e.target.value } : r);
+                              setResources(newResources);
+                              // Update mockData directly for demo purposes
+                              const target = mockResources.find(r => r.id === item.id);
+                              if (target) target.url = e.target.value;
+                            }}
+                            placeholder="https://drive.google.com/..."
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Modul Kokurikuler */}
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center">
+                    <BookOpen className="w-5 h-5 mr-2 text-emerald-600" /> Modul Kokurikuler (P5)
+                  </h3>
+                  <div className="grid gap-4">
+                    {resources.filter(r => r.category === 'modul_kokurikuler').map(item => (
+                      <div key={item.id} className="flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <div className="sm:w-1/3 font-semibold text-slate-700">{item.title}</div>
+                        <div className="sm:w-2/3">
+                          <input 
+                            type="url" 
+                            value={item.url}
+                            onChange={(e) => {
+                              const newResources = resources.map(r => r.id === item.id ? { ...r, url: e.target.value } : r);
+                              setResources(newResources);
+                              const target = mockResources.find(r => r.id === item.id);
+                              if (target) target.url = e.target.value;
+                            }}
+                            placeholder="https://drive.google.com/..."
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm bg-white"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Bank Soal */}
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center">
+                    <BookOpen className="w-5 h-5 mr-2 text-amber-600" /> Bank Soal & Evaluasi
+                  </h3>
+                  <div className="grid gap-4">
+                    {resources.filter(r => r.category === 'bank_soal').map(item => (
+                      <div key={item.id} className="flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <div className="sm:w-1/3 font-semibold text-slate-700">{item.title}</div>
+                        <div className="sm:w-2/3">
+                          <input 
+                            type="url" 
+                            value={item.url}
+                            onChange={(e) => {
+                              const newResources = resources.map(r => r.id === item.id ? { ...r, url: e.target.value } : r);
+                              setResources(newResources);
+                              const target = mockResources.find(r => r.id === item.id);
+                              if (target) target.url = e.target.value;
+                            }}
+                            placeholder="https://drive.google.com/..."
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm bg-white"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            </motion.div>
+          )}
+
+          {/* TAB: SETTINGS */}
+          {activeTab === 'settings' && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-8"
+            >
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Pengaturan LMS</h2>
+                  <p className="text-slate-500 mt-1">Konfigurasi platform komunitas belajar</p>
+                </div>
+                <button 
+                  onClick={() => alert('Pengaturan berhasil disimpan!')}
+                  className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-xl font-medium transition-all shadow-sm flex items-center space-x-2 shrink-0"
+                >
+                  <Save className="w-5 h-5" />
+                  <span>Simpan Pengaturan</span>
+                </button>
+              </div>
+
+              <div className="space-y-8 max-w-3xl">
+                {/* General Settings */}
+                <div className="space-y-5">
+                  <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-2">Informasi Umum</h3>
+                  
+                  <div className="grid sm:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Nama Komunitas</label>
+                      <input 
+                        type="text" 
+                        value={settings.communityName}
+                        onChange={(e) => setSettings({...settings, communityName: e.target.value})}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-slate-50 focus:bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Email Kontak</label>
+                      <div className="relative">
+                        <Mail className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input 
+                          type="email" 
+                          value={settings.email}
+                          onChange={(e) => setSettings({...settings, email: e.target.value})}
+                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-slate-50 focus:bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* System Preferences */}
+                <div className="space-y-5">
+                  <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-2">Preferensi Sistem</h3>
+                  
+                  <div className="space-y-4">
+                    <label className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors">
+                      <div>
+                        <div className="font-bold text-slate-900">Pendaftaran Publik Terbuka</div>
+                        <div className="text-sm text-slate-500 mt-0.5">Izinkan pengguna baru mendaftar menggunakan akun belajar.id</div>
+                      </div>
+                      <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.publicRegistration ? 'bg-blue-600' : 'bg-slate-200'}`} onClick={() => setSettings({...settings, publicRegistration: !settings.publicRegistration})}>
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.publicRegistration ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </div>
+                    </label>
+
+                    <label className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors">
+                      <div>
+                        <div className="font-bold text-slate-900">Penerbitan Sertifikat Otomatis</div>
+                        <div className="text-sm text-slate-500 mt-0.5">Terbitkan sertifikat otomatis setelah peserta mengisi daftar hadir dan tugas</div>
+                      </div>
+                      <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.autoCertificate ? 'bg-blue-600' : 'bg-slate-200'}`} onClick={() => setSettings({...settings, autoCertificate: !settings.autoCertificate})}>
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.autoCertificate ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </div>
+      </div>
+
+      {/* Edit / Add Modal */}
+      {editingEvent && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
+          >
+            <div className="bg-slate-50 border-b border-slate-100 px-6 py-5 flex items-center justify-between shrink-0">
+              <h3 className="text-xl font-bold text-slate-900">
+                {isAddingNew ? 'Tambah Kegiatan Baru' : 'Edit Pengaturan Kegiatan'}
+              </h3>
+              <button 
+                onClick={() => {
+                  setEditingEvent(null);
+                  setIsAddingNew(false);
+                }}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto p-6 flex-1 custom-scrollbar">
+              <form id="event-form" onSubmit={handleSaveEvent} className="space-y-8">
+                
+                {/* Section 1: Info Dasar */}
+                <div className="space-y-5">
+                  <h4 className="text-sm font-bold text-blue-600 uppercase tracking-wider">Informasi Dasar</h4>
+                  
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Judul Kegiatan</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={editingEvent.title}
+                      onChange={e => setEditingEvent({...editingEvent, title: e.target.value})}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+                      placeholder="Contoh: Workshop Implementasi Kurikulum Merdeka"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Deskripsi</label>
+                    <textarea 
+                      required
+                      rows={3}
+                      value={editingEvent.description}
+                      onChange={e => setEditingEvent({...editingEvent, description: e.target.value})}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors resize-none"
+                      placeholder="Jelaskan tujuan dan materi kegiatan..."
+                    />
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Narasumber</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={editingEvent.speaker}
+                        onChange={e => setEditingEvent({...editingEvent, speaker: e.target.value})}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+                        placeholder="Nama Pemateri"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Lokasi / Media</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={editingEvent.location}
+                        onChange={e => setEditingEvent({...editingEvent, location: e.target.value})}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+                        placeholder="Contoh: Zoom Meeting atau SDN Beji 1"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Status</label>
+                      <select 
+                        value={editingEvent.status}
+                        onChange={e => setEditingEvent({...editingEvent, status: e.target.value as any})}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors font-medium"
+                      >
+                        <option value="upcoming">Akan Datang</option>
+                        <option value="completed">Selesai</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Tanggal</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={editingEvent.date}
+                        onChange={e => setEditingEvent({...editingEvent, date: e.target.value})}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+                        placeholder="Contoh: 15 Agustus 2026"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: Tautan LMS */}
+                <div className="space-y-5 pt-6 border-t border-slate-100">
+                  <h4 className="text-sm font-bold text-indigo-600 uppercase tracking-wider flex items-center">
+                    <Settings className="w-4 h-4 mr-2" /> Tautan Administrasi & LMS
+                  </h4>
+                  
+                  <div className="space-y-4 bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Link Materi Kegiatan</label>
+                      <input 
+                        type="url" 
+                        value={editingEvent.materialsLink || ''}
+                        onChange={e => setEditingEvent({...editingEvent, materialsLink: e.target.value})}
+                        placeholder="https://drive.google.com/..."
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Link Daftar Hadir</label>
+                      <input 
+                        type="url" 
+                        value={editingEvent.attendanceLink || ''}
+                        onChange={e => setEditingEvent({...editingEvent, attendanceLink: e.target.value})}
+                        placeholder="https://forms.gle/..."
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Link Pengumpulan Tugas</label>
+                      <input 
+                        type="url" 
+                        value={editingEvent.submissionLink || ''}
+                        onChange={e => setEditingEvent({...editingEvent, submissionLink: e.target.value})}
+                        placeholder="https://forms.gle/..."
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Link Umpan Balik</label>
+                      <input 
+                        type="url" 
+                        value={editingEvent.feedbackLink || ''}
+                        onChange={e => setEditingEvent({...editingEvent, feedbackLink: e.target.value})}
+                        placeholder="https://forms.gle/..."
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Link Download Sertifikat</label>
+                      <input 
+                        type="url" 
+                        value={editingEvent.certificateLink || ''}
+                        onChange={e => setEditingEvent({...editingEvent, certificateLink: e.target.value})}
+                        placeholder="https://drive.google.com/... atau https://forms.gle/..."
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+              </form>
+            </div>
+
+            <div className="bg-slate-50 border-t border-slate-100 px-6 py-4 flex justify-end space-x-3 shrink-0">
+              <button 
+                type="button"
+                onClick={() => {
+                  setEditingEvent(null);
+                  setIsAddingNew(false);
+                }}
+                className="px-6 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                Batal
+              </button>
+              <button 
+                type="submit"
+                form="event-form"
+                className="px-6 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg flex items-center"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Simpan Kegiatan
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+}
+
