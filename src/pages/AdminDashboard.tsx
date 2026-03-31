@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../store/auth';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Plus, Edit2, Trash2, Users, FileText, Settings, Search, Calendar, X, CheckCircle2, XCircle, Download, Eye, Save, Building, Mail, Phone, User, Award, BookOpen } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users, FileText, Settings, Search, Calendar, X, CheckCircle2, XCircle, Download, Eye, Save, Building, Mail, Phone, User, Award, BookOpen, BarChart3, UserPlus } from 'lucide-react';
 import { getEvents, createEvent, updateEvent, deleteEvent, getResources, getAllUserReports } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { Event, ResourceItem, UserReport } from '../types';
@@ -15,7 +15,7 @@ export function AdminDashboard() {
   const [allReports, setAllReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const [activeTab, setActiveTab] = useState<'events' | 'users' | 'reports' | 'settings' | 'resources'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'users' | 'reports' | 'settings' | 'resources' | 'statistics'>('events');
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
 
@@ -90,6 +90,21 @@ export function AdminDashboard() {
         setEvents(events.filter(ev => ev.id !== id));
       } catch (error: any) {
         alert(`Gagal menghapus kegiatan: ${error.message}`);
+      }
+    }
+  };
+
+  const handleUpdateEventStats = async (id: string, field: 'attendanceRate' | 'satisfactionRate', value: number) => {
+    try {
+      // Optimistic update
+      setEvents(events.map(ev => ev.id === id ? { ...ev, [field]: value } : ev));
+      await updateEvent(id, { [field]: value });
+    } catch (error: any) {
+      alert(`Gagal memperbarui statistik: ${error.message}`);
+      // Revert on error
+      const originalEvent = events.find(ev => ev.id === id);
+      if (originalEvent) {
+        setEvents(events.map(ev => ev.id === id ? { ...ev, [field]: originalEvent[field] } : ev));
       }
     }
   };
@@ -185,6 +200,13 @@ export function AdminDashboard() {
                 >
                   <BookOpen className={`w-5 h-5 ${activeTab === 'resources' ? 'text-blue-600' : 'text-slate-400'}`} />
                   <span className="text-left leading-tight">Perangkat Pembelajaran</span>
+                </button>
+                <button 
+                  onClick={() => setActiveTab('statistics')}
+                  className={`w-full flex items-center space-x-3 px-4 py-3.5 rounded-2xl transition-all ${activeTab === 'statistics' ? 'bg-blue-50 text-blue-700 font-semibold shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+                >
+                  <BarChart3 className={`w-5 h-5 ${activeTab === 'statistics' ? 'text-blue-600' : 'text-slate-400'}`} />
+                  <span className="text-left leading-tight">Statistik & Umpan Balik</span>
                 </button>
                 <button 
                   onClick={() => setActiveTab('settings')}
@@ -309,6 +331,37 @@ export function AdminDashboard() {
                   <Download className="w-5 h-5" />
                   <span>Ekspor Data</span>
                 </button>
+              </div>
+
+              {/* STATISTIK ANGGOTA */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100 flex items-center justify-between">
+                  <div>
+                    <div className="text-blue-600 text-sm font-bold mb-1">Total Pendaftar</div>
+                    <div className="text-3xl font-extrabold text-blue-900">{allUsers.length}</div>
+                  </div>
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                    <Users className="w-6 h-6" />
+                  </div>
+                </div>
+                <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 flex items-center justify-between">
+                  <div>
+                    <div className="text-emerald-600 text-sm font-bold mb-1">Anggota Aktif</div>
+                    <div className="text-3xl font-extrabold text-emerald-900">{allUsers.filter(u => u.status === 'active').length}</div>
+                  </div>
+                  <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                </div>
+                <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100 flex items-center justify-between">
+                  <div>
+                    <div className="text-amber-600 text-sm font-bold mb-1">Menunggu Validasi</div>
+                    <div className="text-3xl font-extrabold text-amber-900">{allUsers.filter(u => u.status === 'pending').length}</div>
+                  </div>
+                  <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center text-amber-600">
+                    <UserPlus className="w-6 h-6" />
+                  </div>
+                </div>
               </div>
 
               <div className="overflow-x-auto rounded-2xl border border-slate-100">
@@ -576,6 +629,69 @@ export function AdminDashboard() {
           )}
 
           {/* TAB: SETTINGS */}
+          {activeTab === 'statistics' && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-8"
+            >
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold text-slate-900">Statistik & Umpan Balik Kegiatan</h2>
+                <p className="text-slate-500 mt-1">Atur tingkat kehadiran dan kepuasan peserta untuk kegiatan yang telah selesai.</p>
+              </div>
+
+              <div className="space-y-6">
+                {events.filter(e => e.status === 'completed').map(event => (
+                  <div key={event.id} className="border border-slate-200 rounded-2xl p-6 hover:shadow-md transition-shadow bg-slate-50/50">
+                    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4">
+                      <div>
+                        <h3 className="font-bold text-lg text-slate-900">{event.title}</h3>
+                        <p className="text-sm text-slate-500 mt-1 flex items-center">
+                          <Calendar className="w-4 h-4 mr-1.5" /> {event.date}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Tingkat Kehadiran (%)</label>
+                        <div className="flex items-center space-x-3">
+                          <input 
+                            type="number" 
+                            min="0" max="100"
+                            value={event.attendanceRate || 0}
+                            onChange={(e) => handleUpdateEventStats(event.id, 'attendanceRate', parseInt(e.target.value) || 0)}
+                            className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                          <span className="text-slate-500 font-medium">%</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Kepuasan Peserta (%)</label>
+                        <div className="flex items-center space-x-3">
+                          <input 
+                            type="number" 
+                            min="0" max="100"
+                            value={event.satisfactionRate || 0}
+                            onChange={(e) => handleUpdateEventStats(event.id, 'satisfactionRate', parseInt(e.target.value) || 0)}
+                            className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                          <span className="text-slate-500 font-medium">%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {events.filter(e => e.status === 'completed').length === 0 && (
+                  <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-200 border-dashed">
+                    <BarChart3 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <h3 className="text-lg font-medium text-slate-900">Belum ada kegiatan selesai</h3>
+                    <p className="text-slate-500">Statistik hanya dapat diatur untuk kegiatan yang telah selesai.</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
           {activeTab === 'settings' && (
             <motion.div 
               initial={{ opacity: 0, y: 10 }}

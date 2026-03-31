@@ -12,6 +12,8 @@ export interface Event {
   attendanceLink?: string;
   submissionLink?: string;
   feedbackLink?: string;
+  attendanceRate?: number;
+  satisfactionRate?: number;
 }
 
 export interface UserReport {

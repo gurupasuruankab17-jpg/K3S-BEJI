@@ -1,31 +1,44 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { motion, useMotionValue, useTransform, animate } from 'motion/react';
 import { BookOpen, Users, Award, Calendar, ArrowRight, CheckCircle2, BarChart3, Download, FileText, Layers, FileQuestion, Lock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useAuth } from '../store/auth';
-import { getEvents, getChartData, getResources } from '../lib/api';
+import { getEvents, getResources } from '../lib/api';
 import { Event, ResourceItem } from '../types';
+import { supabase } from '../lib/supabase';
+
+function AnimatedCounter({ value }: { value: number }) {
+  const count = useMotionValue(0);
+  const rounded = useTransform(count, Math.round);
+
+  useEffect(() => {
+    const animation = animate(count, value, { duration: 2, ease: "easeOut" });
+    return animation.stop;
+  }, [value, count]);
+
+  return <motion.span>{rounded}</motion.span>;
+}
 
 export function Home() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [events, setEvents] = useState<Event[]>([]);
-  const [chartData, setChartData] = useState<any[]>([]);
   const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [totalMembers, setTotalMembers] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [eventsData, chartRes, resourcesData] = await Promise.all([
+        const [eventsData, resourcesData, { count }] = await Promise.all([
           getEvents(),
-          getChartData(),
-          getResources()
+          getResources(),
+          supabase.from('users').select('*', { count: 'exact', head: true })
         ]);
         setEvents(eventsData);
-        setChartData(chartRes);
         setResources(resourcesData);
+        setTotalMembers(count || 0);
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -37,6 +50,12 @@ export function Home() {
 
   const upcomingEvents = events.filter(e => e.status === 'upcoming');
   const pastEvents = events.filter(e => e.status === 'completed');
+
+  const chartData = pastEvents.map(e => ({
+    name: e.title.length > 20 ? e.title.substring(0, 20) + '...' : e.title,
+    kehadiran: e.attendanceRate || 0,
+    kepuasan: e.satisfactionRate || 0
+  }));
 
   const handleDownloadClick = (e: React.MouseEvent, url: string) => {
     e.preventDefault();
@@ -93,6 +112,33 @@ export function Home() {
                   Lihat Kegiatan
                 </a>
               </div>
+
+              {/* Animated Statistics */}
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 1, delay: 0.6 }}
+                className="mt-12 grid grid-cols-3 gap-6 border-t border-blue-800/50 pt-8"
+              >
+                <div>
+                  <div className="text-3xl md:text-4xl font-extrabold text-white mb-1 flex items-center">
+                    <AnimatedCounter value={totalMembers} /><span className="text-blue-400 ml-1">+</span>
+                  </div>
+                  <div className="text-sm md:text-base text-blue-200 font-medium">Anggota Terdaftar</div>
+                </div>
+                <div>
+                  <div className="text-3xl md:text-4xl font-extrabold text-white mb-1 flex items-center">
+                    <AnimatedCounter value={pastEvents.length} /><span className="text-blue-400 ml-1">+</span>
+                  </div>
+                  <div className="text-sm md:text-base text-blue-200 font-medium">Kegiatan Selesai</div>
+                </div>
+                <div>
+                  <div className="text-3xl md:text-4xl font-extrabold text-white mb-1 flex items-center">
+                    <AnimatedCounter value={resources.length} /><span className="text-blue-400 ml-1">+</span>
+                  </div>
+                  <div className="text-sm md:text-base text-blue-200 font-medium">Perangkat Ajar</div>
+                </div>
+              </motion.div>
             </motion.div>
             
             <motion.div

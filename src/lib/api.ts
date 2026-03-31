@@ -19,15 +19,6 @@ export async function getResources() {
   return data as ResourceItem[];
 }
 
-export async function getChartData() {
-  const { data, error } = await supabase.from('chart_data').select('*');
-  if (error) {
-    console.warn('Chart data not found, using empty array', error);
-    return [];
-  }
-  return data;
-}
-
 export async function getUserReports(userId?: string) {
   if (!userId) return [];
   const { data, error } = await supabase.from('user_reports').select('*').eq('user_id', userId);

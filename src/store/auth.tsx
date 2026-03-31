@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 type UserRole = 'admin' | 'user' | null;
 
@@ -31,6 +31,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
@@ -94,6 +99,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const login = async (email: string, password?: string) => {
+    if (!isSupabaseConfigured) {
+      alert('Supabase is not configured. Please connect to Supabase first.');
+      return;
+    }
     if (!password) {
       alert('Password is required for email login');
       return;
@@ -104,12 +113,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (error) {
-      alert(`Login gagal: ${error.message}`);
       throw error;
     }
   };
 
   const loginWithGoogle = async () => {
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase is not configured. Please connect to Supabase first.');
+    }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -119,12 +130,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
     if (error) {
-      alert(`Login gagal: ${error.message}`);
       throw error;
     }
   };
 
   const logout = async () => {
+    if (!isSupabaseConfigured) return;
     await supabase.auth.signOut();
   };
 
