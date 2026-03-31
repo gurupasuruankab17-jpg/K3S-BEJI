@@ -1,26 +1,127 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../store/auth';
 import { motion } from 'motion/react';
-import { LogIn, KeyRound, Mail } from 'lucide-react';
+import { LogIn, KeyRound, Mail, UserPlus, Building, Phone, User, CheckCircle2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, loginWithGoogle, user } = useAuth();
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  
+  // Registration fields
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [nip, setNip] = useState('');
+  const [school, setSchool] = useState('');
+  const [employmentStatus, setEmploymentStatus] = useState('tendik');
+  const [phone, setPhone] = useState('');
+  
+  const { login, loginWithGoogle, user, logout } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already logged in
-  if (user) {
+  useEffect(() => {
+    if (user?.status === 'needs_registration') {
+      setIsRegistering(true);
+      setEmail(user.email);
+      // Pre-fill name if available from Google
+      if (user.name && user.name !== user.email.split('@')[0]) {
+        const parts = user.name.split(' ');
+        setFirstName(parts[0]);
+        if (parts.length > 1) {
+          setLastName(parts.slice(1).join(' '));
+        }
+      }
+    }
+  }, [user]);
+
+  // Redirect if already logged in and active
+  if (user && user.status !== 'needs_registration' && user.status !== 'pending') {
     navigate(user.role === 'admin' ? '/admin' : '/dashboard');
     return null;
+  }
+
+  if (user?.status === 'pending') {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-slate-50 px-4 py-12 sm:px-6 lg:px-8">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full space-y-8 bg-white p-10 rounded-3xl shadow-xl border border-slate-100 text-center"
+        >
+          <div className="mx-auto w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4">
+            <CheckCircle2 className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900">Pendaftaran Berhasil</h2>
+          <p className="text-slate-600">
+            Akun Anda sedang menunggu validasi oleh Admin. Silakan hubungi admin untuk mempercepat proses validasi.
+          </p>
+          <a 
+            href="https://wa.me/6285749662221" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="mt-6 inline-flex items-center justify-center w-full px-4 py-3 border border-transparent text-sm font-medium rounded-xl text-white bg-green-600 hover:bg-green-700 transition-colors"
+          >
+            Hubungi Admin via WhatsApp
+          </a>
+          <button 
+            onClick={() => logout()}
+            className="mt-4 text-sm text-slate-500 hover:text-slate-700"
+          >
+            Keluar
+          </button>
+        </motion.div>
+      </div>
+    );
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login(email, password);
-    } catch (error) {
+      if (isRegistering) {
+        let authUserId = user?.id;
+        
+        // If not already authenticated via Google, create auth user
+        if (!authUserId) {
+          const { data: authData, error: authError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                full_name: `${firstName} ${lastName}`.trim(),
+              }
+            }
+          });
+          if (authError) throw authError;
+          authUserId = authData.user?.id;
+        }
+
+        if (!authUserId) throw new Error("Gagal membuat akun");
+
+        // Insert into users table with pending status
+        const { error: insertError } = await supabase.from('users').insert({
+          id: authUserId,
+          name: `${firstName} ${lastName}`.trim(),
+          email,
+          role: 'user',
+          status: 'pending',
+          school,
+          nip,
+          phone,
+          employment_status: employmentStatus,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`
+        });
+
+        if (insertError) throw insertError;
+
+        setShowSuccessPopup(true);
+      } else {
+        await login(email, password);
+      }
+    } catch (error: any) {
+      alert(`Error: ${error.message}`);
       console.error(error);
     }
   };
@@ -32,6 +133,38 @@ export function Login() {
       console.error(error);
     }
   };
+
+  if (showSuccessPopup) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-slate-50 px-4 py-12 sm:px-6 lg:px-8">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-md w-full space-y-8 bg-white p-10 rounded-3xl shadow-xl border border-slate-100 text-center"
+        >
+          <div className="mx-auto w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
+            <CheckCircle2 className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900">Pendaftaran Berhasil!</h2>
+          <p className="text-slate-600">
+            Terima kasih telah mendaftar. Akun Anda akan aktif setelah divalidasi oleh admin.
+          </p>
+          <p className="text-sm text-slate-500 mt-4">
+            Anda akan dialihkan ke WhatsApp Admin untuk konfirmasi.
+          </p>
+          <a 
+            href="https://wa.me/6285749662221" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            onClick={() => window.location.reload()}
+            className="mt-6 inline-flex items-center justify-center w-full px-4 py-3 border border-transparent text-sm font-medium rounded-xl text-white bg-green-600 hover:bg-green-700 transition-colors"
+          >
+            Lanjutkan ke WhatsApp
+          </a>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-slate-50 px-4 py-12 sm:px-6 lg:px-8">
@@ -48,7 +181,7 @@ export function Login() {
             referrerPolicy="no-referrer"
           />
           <h2 className="mt-6 text-center text-3xl font-extrabold text-slate-900">
-            Masuk ke Platform
+            {isRegistering ? 'Daftar Akun Baru' : 'Masuk ke Platform'}
           </h2>
           <p className="mt-2 text-center text-sm text-slate-600">
             Komunitas Belajar K3S Beji
@@ -56,47 +189,137 @@ export function Login() {
         </div>
 
         <div className="mt-8 space-y-6">
-          <button
-            onClick={handleBelajarIdLogin}
-            className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all hover:shadow-md"
-          >
-            <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z" />
-            </svg>
-            Masuk dengan Akun belajar.id
-          </button>
+          {!isRegistering && (
+            <button
+              onClick={handleBelajarIdLogin}
+              type="button"
+              className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all hover:shadow-md"
+            >
+              <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z" />
+              </svg>
+              Masuk dengan Akun belajar.id
+            </button>
+          )}
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200" />
+          {!isRegistering && (
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-slate-500">Atau gunakan username</span>
+              </div>
             </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-slate-500">Atau gunakan username</span>
-            </div>
-          </div>
+          )}
 
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="email" className="sr-only">Username / Email</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Mail className="h-5 w-5 text-slate-400" />
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            {isRegistering && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Nama Depan</label>
+                    <input
+                      type="text"
+                      required
+                      className="appearance-none rounded-xl relative block w-full px-3 py-2 border border-slate-300 placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                    />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Nama Belakang</label>
+                    <input
+                      type="text"
+                      required
+                      className="appearance-none rounded-xl relative block w-full px-3 py-2 border border-slate-300 placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">NIP / NIPY / NIK</label>
                   <input
-                    id="email"
-                    name="email"
                     type="text"
                     required
-                    className="appearance-none rounded-xl relative block w-full px-3 py-3 pl-10 border border-slate-300 placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors"
-                    placeholder="Username atau Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    className="appearance-none rounded-xl relative block w-full px-3 py-2 border border-slate-300 placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    value={nip}
+                    onChange={(e) => setNip(e.target.value)}
                   />
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Asal Lembaga</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Building className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      className="appearance-none rounded-xl relative block w-full px-3 py-2 pl-10 border border-slate-300 placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      value={school}
+                      onChange={(e) => setSchool(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Status Kepegawaian</label>
+                  <select
+                    value={employmentStatus}
+                    onChange={(e) => setEmploymentStatus(e.target.value)}
+                    className="appearance-none rounded-xl relative block w-full px-3 py-2 border border-slate-300 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
+                  >
+                    <option value="tendik">Tenaga Pendidik (Guru)</option>
+                    <option value="kependidikan">Tenaga Kependidikan</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">No HP (+62)</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Phone className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="+628123456789"
+                      className="appearance-none rounded-xl relative block w-full px-3 py-2 pl-10 border border-slate-300 placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-slate-400" />
+                </div>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  disabled={user?.status === 'needs_registration'}
+                  className="appearance-none rounded-xl relative block w-full px-3 py-2 pl-10 border border-slate-300 placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors disabled:bg-slate-100 disabled:text-slate-500"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
+            </div>
+            
+            {(!user || user.status !== 'needs_registration') && (
               <div>
-                <label htmlFor="password" className="sr-only">Password</label>
+                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">Password</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <KeyRound className="h-5 w-5 text-slate-400" />
@@ -106,32 +329,53 @@ export function Login() {
                     name="password"
                     type="password"
                     required
-                    className="appearance-none rounded-xl relative block w-full px-3 py-3 pl-10 border border-slate-300 placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors"
+                    className="appearance-none rounded-xl relative block w-full px-3 py-2 pl-10 border border-slate-300 placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors"
                     placeholder="Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
               </div>
-            </div>
+            )}
 
-            <div>
+            <div className="flex gap-4 pt-2">
               <button
                 type="submit"
-                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-white bg-slate-800 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 transition-all shadow-sm hover:shadow-md"
+                className="group relative flex-1 flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-white bg-slate-800 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 transition-all shadow-sm hover:shadow-md"
               >
-                <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                  <LogIn className="h-5 w-5 text-slate-500 group-hover:text-slate-400 transition-colors" />
-                </span>
-                Masuk
+                {isRegistering ? 'Kirim Pendaftaran' : 'Masuk'}
               </button>
+              
+              {!isRegistering && !user && (
+                <button
+                  type="button"
+                  onClick={() => setIsRegistering(true)}
+                  className="group relative flex-1 flex justify-center py-3 px-4 border border-slate-300 text-sm font-medium rounded-xl text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 transition-all shadow-sm"
+                >
+                  Daftar
+                </button>
+              )}
             </div>
+            
+            {isRegistering && !user && (
+              <div className="text-center mt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsRegistering(false)}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Sudah punya akun? Masuk di sini
+                </button>
+              </div>
+            )}
           </form>
           
-          <div className="mt-4 text-center text-sm text-slate-500">
-            <p>Untuk akses Admin gunakan:</p>
-            <p className="font-mono mt-1 bg-slate-100 inline-block px-2 py-1 rounded text-slate-700">admin / admin@123d</p>
-          </div>
+          {!isRegistering && (
+            <div className="mt-4 text-center text-sm text-slate-500">
+              <p>Untuk akses Admin gunakan:</p>
+              <p className="font-mono mt-1 bg-slate-100 inline-block px-2 py-1 rounded text-slate-700">admin / admin@123d</p>
+            </div>
+          )}
         </div>
       </motion.div>
     </div>

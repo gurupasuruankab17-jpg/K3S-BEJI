@@ -1,30 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { mockEvents, mockUserReports } from '../data/mockData';
 import { useAuth } from '../store/auth';
 import { Calendar, MapPin, User, FileText, CheckCircle2, ArrowLeft, Download, ClipboardCheck, UploadCloud, MessageSquareHeart, Lock } from 'lucide-react';
+import { getEventById, getUserReports, updateUserReport } from '../lib/api';
+import { Event, UserReport } from '../types';
 
 export function EventDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const event = mockEvents.find(e => e.id === id);
+  const [event, setEvent] = useState<Event | null>(null);
+  const [userReport, setUserReport] = useState<UserReport | null>(null);
+  const [loading, setLoading] = useState(true);
   
-  // Check if user is already registered in mock data
-  const userReport = mockUserReports.find(r => r.eventId === id);
-  const [isRegistered, setIsRegistered] = useState(!!userReport);
+  const [isRegistered, setIsRegistered] = useState(false);
 
   // Progress State
   const [progress, setProgress] = useState({
-    hasAttended: userReport?.hasAttended || false,
-    hasSubmittedTask: userReport?.hasSubmittedTask || false,
-    hasSubmittedFeedback: userReport?.hasSubmittedFeedback || false,
-    certificateIssued: userReport?.certificateIssued || false,
+    hasAttended: false,
+    hasSubmittedTask: false,
+    hasSubmittedFeedback: false,
+    certificateIssued: false,
   });
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!id) return;
+      try {
+        const eventData = await getEventById(id);
+        setEvent(eventData);
+
+        if (user) {
+          const reports = await getUserReports(user.id);
+          const report = reports.find(r => r.eventId === id);
+          if (report) {
+            setUserReport(report);
+            setIsRegistered(true);
+            setProgress({
+              hasAttended: report.hasAttended || false,
+              hasSubmittedTask: report.hasSubmittedTask || false,
+              hasSubmittedFeedback: report.hasSubmittedFeedback || false,
+              certificateIssued: report.certificateIssued || false,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching event details:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [id, user]);
 
   // Check if all requirements are met
   const allRequirementsMet = progress.hasAttended && progress.hasSubmittedTask && progress.hasSubmittedFeedback;
+
+  if (loading) {
+    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+  }
 
   if (!event) {
     return (

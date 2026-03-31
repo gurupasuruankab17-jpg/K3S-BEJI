@@ -1,22 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../store/auth';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { mockEvents, Event, mockUserReports, mockResources, ResourceItem } from '../data/mockData';
 import { Plus, Edit2, Trash2, Users, FileText, Settings, Search, Calendar, X, CheckCircle2, XCircle, Download, Eye, Save, Building, Mail, Phone, User, Award, BookOpen } from 'lucide-react';
-
-// Mock Data for Users
-const mockUsers = [
-  { id: '1', name: 'Budi Santoso, M.Pd.', email: 'budi.santoso@belajar.id', role: 'Kepala Sekolah', school: 'SDN Beji 1', status: 'active' },
-  { id: '2', name: 'Siti Aminah, S.Pd.', email: 'siti.aminah@belajar.id', role: 'Guru Kelas', school: 'SDN Beji 2', status: 'active' },
-  { id: '3', name: 'Ahmad Fauzi, S.Pd.', email: 'ahmad.fauzi@belajar.id', role: 'Guru PJOK', school: 'SDN Beji 1', status: 'inactive' },
-  { id: '4', name: 'Rina Wati, M.Pd.', email: 'rina.wati@belajar.id', role: 'Kepala Sekolah', school: 'SDN Beji 3', status: 'active' },
-];
+import { getEvents, createEvent, updateEvent, deleteEvent, getResources, getAllUserReports } from '../lib/api';
+import { supabase } from '../lib/supabase';
+import { Event, ResourceItem, UserReport } from '../types';
 
 export function AdminDashboard() {
   const { user } = useAuth();
-  const [events, setEvents] = useState<Event[]>(mockEvents);
-  const [resources, setResources] = useState<ResourceItem[]>(mockResources);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [allReports, setAllReports] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
   const [activeTab, setActiveTab] = useState<'events' | 'users' | 'reports' | 'settings' | 'resources'>('events');
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -30,26 +28,97 @@ export function AdminDashboard() {
     autoCertificate: true,
   });
 
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [eventsData, resourcesData, reportsData, { data: usersData }] = await Promise.all([
+          getEvents(),
+          getResources(),
+          getAllUserReports(),
+          supabase.from('users').select('*')
+        ]);
+        setEvents(eventsData);
+        setResources(resourcesData);
+        setAllReports(reportsData || []);
+        setAllUsers(usersData || []);
+      } catch (error) {
+        console.error('Error fetching admin data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    if (user?.role === 'admin') {
+      fetchData();
+    }
+  }, [user]);
+
   if (!user || user.role !== 'admin') {
     return <Navigate to="/login" replace />;
   }
 
-  const handleSaveEvent = (e: React.FormEvent) => {
+  if (loading) {
+    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+  }
+
+  const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isAddingNew && editingEvent) {
-      setEvents([...events, { ...editingEvent, id: Date.now().toString() }]);
-      alert('Kegiatan baru berhasil ditambahkan!');
-    } else if (editingEvent) {
-      setEvents(events.map(ev => ev.id === editingEvent.id ? editingEvent : ev));
-      alert('Kegiatan berhasil diperbarui!');
+    if (!editingEvent) return;
+    
+    try {
+      if (isAddingNew) {
+        const { id, ...newEventData } = editingEvent;
+        const savedEvent = await createEvent(newEventData);
+        setEvents([savedEvent, ...events]);
+        alert('Kegiatan baru berhasil ditambahkan!');
+      } else {
+        const { id, ...updateData } = editingEvent;
+        const updatedEvent = await updateEvent(id, updateData);
+        setEvents(events.map(ev => ev.id === id ? updatedEvent : ev));
+        alert('Kegiatan berhasil diperbarui!');
+      }
+      setEditingEvent(null);
+      setIsAddingNew(false);
+    } catch (error: any) {
+      alert(`Gagal menyimpan kegiatan: ${error.message}`);
     }
-    setEditingEvent(null);
-    setIsAddingNew(false);
   };
 
-  const handleDeleteEvent = (id: string) => {
+  const handleDeleteEvent = async (id: string) => {
     if (window.confirm('Apakah Anda yakin ingin menghapus kegiatan ini?')) {
-      setEvents(events.filter(ev => ev.id !== id));
+      try {
+        await deleteEvent(id);
+        setEvents(events.filter(ev => ev.id !== id));
+      } catch (error: any) {
+        alert(`Gagal menghapus kegiatan: ${error.message}`);
+      }
+    }
+  };
+
+  const handleSaveResources = async () => {
+    try {
+      // In a real app, you'd update each resource or use an upsert
+      for (const resource of resources) {
+        await supabase.from('resources').update({ url: resource.url }).eq('id', resource.id);
+      }
+      alert('Tautan perangkat pembelajaran berhasil disimpan!');
+    } catch (error: any) {
+      alert(`Gagal menyimpan perangkat: ${error.message}`);
+    }
+  };
+
+  const handleValidateUser = async (userId: string, newStatus: 'active' | 'inactive') => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ status: newStatus })
+        .eq('id', userId);
+        
+      if (error) throw error;
+      
+      setAllUsers(allUsers.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+      alert(`Pengguna berhasil diubah menjadi ${newStatus === 'active' ? 'Aktif' : 'Nonaktif'}`);
+    } catch (error: any) {
+      alert(`Gagal memvalidasi pengguna: ${error.message}`);
     }
   };
 
@@ -254,23 +323,27 @@ export function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {mockUsers.map((u) => (
+                    {allUsers.map((u) => (
                       <tr key={u.id} className="hover:bg-slate-50/50 transition-colors bg-white">
                         <td className="py-4 px-6">
                           <div className="font-bold text-slate-900">{u.name}</div>
                           <div className="text-sm text-slate-500 mt-1">{u.email}</div>
                         </td>
-                        <td className="py-4 px-6 text-slate-700 text-sm font-medium">{u.role}</td>
+                        <td className="py-4 px-6 text-slate-700 text-sm font-medium">{u.role === 'admin' ? 'Admin' : 'Guru'}</td>
                         <td className="py-4 px-6 text-slate-600 text-sm">
                           <div className="flex items-center">
                             <Building className="w-4 h-4 mr-2 text-slate-400" />
-                            {u.school}
+                            {u.school || '-'}
                           </div>
                         </td>
                         <td className="py-4 px-6">
                           {u.status === 'active' ? (
                             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
                               <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Aktif
+                            </span>
+                          ) : u.status === 'pending' ? (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
+                              <XCircle className="w-3.5 h-3.5 mr-1" /> Menunggu Validasi
                             </span>
                           ) : (
                             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
@@ -279,9 +352,26 @@ export function AdminDashboard() {
                           )}
                         </td>
                         <td className="py-4 px-6 text-right">
-                          <button className="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors">
-                            Detail
-                          </button>
+                          {u.status === 'pending' ? (
+                            <div className="flex justify-end space-x-2">
+                              <button 
+                                onClick={() => handleValidateUser(u.id, 'active')}
+                                className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-3 py-1 rounded-lg text-sm font-medium transition-colors"
+                              >
+                                Setujui
+                              </button>
+                              <button 
+                                onClick={() => handleValidateUser(u.id, 'inactive')}
+                                className="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded-lg text-sm font-medium transition-colors"
+                              >
+                                Tolak
+                              </button>
+                            </div>
+                          ) : (
+                            <button className="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors">
+                              Detail
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -342,18 +432,36 @@ export function AdminDashboard() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          <tr>
-                            <td className="py-3 px-4 font-medium text-slate-900">Budi Santoso, M.Pd.</td>
-                            <td className="py-3 px-4 text-center"><CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto" /></td>
-                            <td className="py-3 px-4 text-center"><CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto" /></td>
-                            <td className="py-3 px-4 text-center"><span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md">Diterbitkan</span></td>
-                          </tr>
-                          <tr>
-                            <td className="py-3 px-4 font-medium text-slate-900">Siti Aminah, S.Pd.</td>
-                            <td className="py-3 px-4 text-center"><CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto" /></td>
-                            <td className="py-3 px-4 text-center"><XCircle className="w-5 h-5 text-red-400 mx-auto" /></td>
-                            <td className="py-3 px-4 text-center"><span className="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-md">Tertunda</span></td>
-                          </tr>
+                          {allReports.filter(r => r.event_id === event.id).map((report) => {
+                            const participant = allUsers.find(u => u.id === report.user_id);
+                            return (
+                              <tr key={report.id}>
+                                <td className="py-3 px-4 font-medium text-slate-900">{participant?.name || 'Unknown User'}</td>
+                                <td className="py-3 px-4 text-center">
+                                  {report.report_url ? <CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto" /> : <XCircle className="w-5 h-5 text-slate-300 mx-auto" />}
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  {report.report_url ? (
+                                    <a href={report.report_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Lihat</a>
+                                  ) : (
+                                    <span className="text-slate-400">-</span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  {report.certificate_url ? (
+                                    <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md">Diterbitkan</span>
+                                  ) : (
+                                    <span className="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-md">Tertunda</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {allReports.filter(r => r.event_id === event.id).length === 0 && (
+                            <tr>
+                              <td colSpan={4} className="py-4 text-center text-slate-500">Belum ada peserta yang mendaftar</td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -376,7 +484,7 @@ export function AdminDashboard() {
                   <p className="text-slate-500 mt-1">Kelola tautan unduhan modul ajar, modul kokurikuler, dan bank soal</p>
                 </div>
                 <button 
-                  onClick={() => alert('Tautan perangkat pembelajaran berhasil disimpan!')}
+                  onClick={handleSaveResources}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-medium transition-all shadow-sm flex items-center space-x-2 shrink-0"
                 >
                   <Save className="w-5 h-5" />
@@ -401,9 +509,6 @@ export function AdminDashboard() {
                             onChange={(e) => {
                               const newResources = resources.map(r => r.id === item.id ? { ...r, url: e.target.value } : r);
                               setResources(newResources);
-                              // Update mockData directly for demo purposes
-                              const target = mockResources.find(r => r.id === item.id);
-                              if (target) target.url = e.target.value;
                             }}
                             placeholder="https://drive.google.com/..."
                             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
@@ -430,8 +535,6 @@ export function AdminDashboard() {
                             onChange={(e) => {
                               const newResources = resources.map(r => r.id === item.id ? { ...r, url: e.target.value } : r);
                               setResources(newResources);
-                              const target = mockResources.find(r => r.id === item.id);
-                              if (target) target.url = e.target.value;
                             }}
                             placeholder="https://drive.google.com/..."
                             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm bg-white"
@@ -458,8 +561,6 @@ export function AdminDashboard() {
                             onChange={(e) => {
                               const newResources = resources.map(r => r.id === item.id ? { ...r, url: e.target.value } : r);
                               setResources(newResources);
-                              const target = mockResources.find(r => r.id === item.id);
-                              if (target) target.url = e.target.value;
                             }}
                             placeholder="https://drive.google.com/..."
                             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm bg-white"

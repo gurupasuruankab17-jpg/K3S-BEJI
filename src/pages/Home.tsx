@@ -1,16 +1,42 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { BookOpen, Users, Award, Calendar, ArrowRight, CheckCircle2, BarChart3, Download, FileText, Layers, FileQuestion, Lock } from 'lucide-react';
-import { mockEvents, mockChartData, mockResources } from '../data/mockData';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useAuth } from '../store/auth';
+import { getEvents, getChartData, getResources } from '../lib/api';
+import { Event, ResourceItem } from '../types';
 
 export function Home() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const upcomingEvents = mockEvents.filter(e => e.status === 'upcoming');
-  const pastEvents = mockEvents.filter(e => e.status === 'completed');
+  const [events, setEvents] = useState<Event[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [eventsData, chartRes, resourcesData] = await Promise.all([
+          getEvents(),
+          getChartData(),
+          getResources()
+        ]);
+        setEvents(eventsData);
+        setChartData(chartRes);
+        setResources(resourcesData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  const upcomingEvents = events.filter(e => e.status === 'upcoming');
+  const pastEvents = events.filter(e => e.status === 'completed');
 
   const handleDownloadClick = (e: React.MouseEvent, url: string) => {
     e.preventDefault();
@@ -25,6 +51,10 @@ export function Home() {
     }
     window.open(url, '_blank', 'noopener,noreferrer');
   };
+
+  if (loading) {
+    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+  }
 
   return (
     <div className="flex flex-col w-full">
@@ -147,7 +177,7 @@ export function Home() {
               <div className="h-80">
                 <h4 className="text-center font-semibold text-slate-700 mb-6">Tingkat Kehadiran (%)</h4>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={mockChartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                  <BarChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} domain={[0, 100]} />
@@ -159,7 +189,7 @@ export function Home() {
               <div className="h-80">
                 <h4 className="text-center font-semibold text-slate-700 mb-6">Kepuasan Peserta (%)</h4>
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={mockChartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                  <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} domain={[0, 100]} />
@@ -195,7 +225,7 @@ export function Home() {
                 Kumpulan modul ajar Kurikulum Merdeka lengkap untuk Kelas 1 hingga Kelas 6 SD.
               </p>
               <div className="space-y-3">
-                {mockResources.filter(r => r.category === 'modul_ajar').map((item) => (
+                {resources.filter(r => r.category === 'modul_ajar').map((item) => (
                   <a 
                     key={item.id} 
                     href={item.url || '#'} 
@@ -226,7 +256,7 @@ export function Home() {
                 Panduan dan modul Projek Penguatan Profil Pelajar Pancasila dengan berbagai tema menarik.
               </p>
               <div className="space-y-3">
-                {mockResources.filter(r => r.category === 'modul_kokurikuler').map((item) => (
+                {resources.filter(r => r.category === 'modul_kokurikuler').map((item) => (
                   <a 
                     key={item.id} 
                     href={item.url || '#'} 
@@ -257,7 +287,7 @@ export function Home() {
                 Kumpulan soal asesmen sumatif, formatif, dan latihan soal OSN untuk persiapan siswa.
               </p>
               <div className="space-y-3">
-                {mockResources.filter(r => r.category === 'bank_soal').map((item) => (
+                {resources.filter(r => r.category === 'bank_soal').map((item) => (
                   <a 
                     key={item.id} 
                     href={item.url || '#'} 

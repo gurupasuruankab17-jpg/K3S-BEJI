@@ -9,6 +9,11 @@ interface User {
   email: string;
   role: UserRole;
   avatar?: string;
+  status?: 'active' | 'inactive' | 'pending';
+  school?: string;
+  nip?: string;
+  phone?: string;
+  employment_status?: string;
 }
 
 interface AuthContextType {
@@ -56,13 +61,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('id', userId)
         .single();
 
-      if (error) {
-        console.warn('Profile not found in users table, using fallback:', error);
+      if (error && error.code === 'PGRST116') {
+        // No rows returned - User needs to register
+        console.warn('Profile not found in users table, needs registration');
         setUser({
           id: userId,
           name: email.split('@')[0],
           email: email,
           role: 'user',
+          status: 'needs_registration' as any,
           avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
         });
       } else if (data) {
@@ -72,6 +79,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: data.email,
           role: data.role,
           avatar: data.avatar,
+          status: data.status,
+          school: data.school,
+          nip: data.nip,
+          phone: data.phone,
+          employment_status: data.employment_status,
         });
       }
     } catch (error) {

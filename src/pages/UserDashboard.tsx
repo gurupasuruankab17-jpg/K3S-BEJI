@@ -1,21 +1,51 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../store/auth';
 import { Navigate, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { mockEvents, mockUserReports, mockResources } from '../data/mockData';
 import { Award, BookOpen, Clock, FileText, CheckCircle2, ChevronRight, Download, Calendar, Lock, Layers, FileQuestion } from 'lucide-react';
+import { getEvents, getUserReports, getResources } from '../lib/api';
+import { Event, UserReport, ResourceItem } from '../types';
 
 export function UserDashboard() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'events' | 'resources'>('events');
+  const [events, setEvents] = useState<Event[]>([]);
+  const [userReports, setUserReports] = useState<UserReport[]>([]);
+  const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!user) return;
+      try {
+        const [eventsData, reportsData, resourcesData] = await Promise.all([
+          getEvents(),
+          getUserReports(user.id),
+          getResources()
+        ]);
+        setEvents(eventsData);
+        setUserReports(reportsData);
+        setResources(resourcesData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [user]);
 
   if (!user || user.role !== 'user') {
     return <Navigate to="/login" replace />;
   }
 
-  // Get user's events based on mock reports
-  const userEvents = mockUserReports.map(report => {
-    const event = mockEvents.find(e => e.id === report.eventId);
+  if (loading) {
+    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+  }
+
+  // Get user's events based on reports
+  const userEvents = userReports.map(report => {
+    const event = events.find(e => e.id === report.eventId);
     return { ...event, ...report };
   }).filter(e => e.id) as any[];
 
@@ -225,7 +255,7 @@ export function UserDashboard() {
               </div>
               <h3 className="text-lg font-bold text-slate-900 mb-2">Modul Ajar</h3>
               <div className="space-y-3 mt-4">
-                {mockResources.filter(r => r.category === 'modul_ajar').map((item) => (
+                {resources.filter(r => r.category === 'modul_ajar').map((item) => (
                   <a 
                     key={item.id} 
                     href={item.url || '#'} 
@@ -246,7 +276,7 @@ export function UserDashboard() {
               </div>
               <h3 className="text-lg font-bold text-slate-900 mb-2">Modul Kokurikuler</h3>
               <div className="space-y-3 mt-4">
-                {mockResources.filter(r => r.category === 'modul_kokurikuler').map((item) => (
+                {resources.filter(r => r.category === 'modul_kokurikuler').map((item) => (
                   <a 
                     key={item.id} 
                     href={item.url || '#'} 
@@ -267,7 +297,7 @@ export function UserDashboard() {
               </div>
               <h3 className="text-lg font-bold text-slate-900 mb-2">Bank Soal</h3>
               <div className="space-y-3 mt-4">
-                {mockResources.filter(r => r.category === 'bank_soal').map((item) => (
+                {resources.filter(r => r.category === 'bank_soal').map((item) => (
                   <a 
                     key={item.id} 
                     href={item.url || '#'} 
