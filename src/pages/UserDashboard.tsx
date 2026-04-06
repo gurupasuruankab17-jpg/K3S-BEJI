@@ -255,15 +255,34 @@ export function UserDashboard() {
               </div>
               <h3 className="text-lg font-bold text-slate-900 mb-2">Modul Ajar</h3>
               <div className="space-y-3 mt-4">
-                {resources.filter(r => r.category === 'modul_ajar').map((item) => (
+                {resources.filter(r => r.category === 'modul_ajar').length === 0 ? (
+                  <div className="text-sm text-slate-500 text-center py-4">Belum ada modul ajar</div>
+                ) : resources.filter(r => r.category === 'modul_ajar').map((item) => (
                   <a 
                     key={item.id} 
                     href={item.url || '#'} 
                     onClick={(e) => handleDownloadClick(e, item.url)}
-                    className="flex items-center justify-between p-3 rounded-xl bg-white hover:bg-blue-50 border border-slate-100 hover:border-blue-100 transition-colors group/link shadow-sm"
+                    className="block p-4 rounded-xl bg-white hover:bg-blue-50 border border-slate-100 hover:border-blue-100 transition-colors group/link shadow-sm"
                   >
-                    <span className="font-medium text-slate-700 group-hover/link:text-blue-600 text-sm">{item.title}</span>
-                    <Download className="w-4 h-4 text-slate-400 group-hover/link:text-blue-600" />
+                    <div className="flex gap-3">
+                      <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
+                        <img 
+                          src={item.imageUrl || `https://api.dicebear.com/7.x/shapes/svg?seed=${item.title}`} 
+                          alt={item.title} 
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-bold text-slate-800 group-hover/link:text-blue-600 text-sm block mb-1 truncate">{item.title}</span>
+                        <div className="text-xs text-slate-500 space-y-0.5">
+                          {item.contributor && <div className="truncate"><span className="font-medium">Oleh:</span> {item.contributor}</div>}
+                          {item.phase && <div className="truncate"><span className="font-medium">Fase:</span> {item.phase}</div>}
+                          {item.class && <div className="truncate"><span className="font-medium">Kelas:</span> {item.class}</div>}
+                        </div>
+                      </div>
+                      <Download className="w-4 h-4 text-slate-400 group-hover/link:text-blue-600 shrink-0 mt-1" />
+                    </div>
                   </a>
                 ))}
               </div>
@@ -276,15 +295,34 @@ export function UserDashboard() {
               </div>
               <h3 className="text-lg font-bold text-slate-900 mb-2">Modul Kokurikuler</h3>
               <div className="space-y-3 mt-4">
-                {resources.filter(r => r.category === 'modul_kokurikuler').map((item) => (
+                {resources.filter(r => r.category === 'modul_kokurikuler').length === 0 ? (
+                  <div className="text-sm text-slate-500 text-center py-4">Belum ada modul kokurikuler</div>
+                ) : resources.filter(r => r.category === 'modul_kokurikuler').map((item) => (
                   <a 
                     key={item.id} 
                     href={item.url || '#'} 
                     onClick={(e) => handleDownloadClick(e, item.url)}
-                    className="flex items-center justify-between p-3 rounded-xl bg-white hover:bg-emerald-50 border border-slate-100 hover:border-emerald-100 transition-colors group/link shadow-sm"
+                    className="block p-4 rounded-xl bg-white hover:bg-emerald-50 border border-slate-100 hover:border-emerald-100 transition-colors group/link shadow-sm"
                   >
-                    <span className="font-medium text-slate-700 group-hover/link:text-emerald-600 text-sm line-clamp-1 pr-2">{item.title}</span>
-                    <Download className="w-4 h-4 text-slate-400 group-hover/link:text-emerald-600 shrink-0" />
+                    <div className="flex gap-3">
+                      <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
+                        <img 
+                          src={item.imageUrl || `https://api.dicebear.com/7.x/shapes/svg?seed=${item.title}`} 
+                          alt={item.title} 
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-bold text-slate-800 group-hover/link:text-emerald-600 text-sm block mb-1 truncate">{item.title}</span>
+                        <div className="text-xs text-slate-500 space-y-0.5">
+                          {item.contributor && <div className="truncate"><span className="font-medium">Oleh:</span> {item.contributor}</div>}
+                          {item.phase && <div className="truncate"><span className="font-medium">Fase:</span> {item.phase}</div>}
+                          {item.class && <div className="truncate"><span className="font-medium">Kelas:</span> {item.class}</div>}
+                        </div>
+                      </div>
+                      <Download className="w-4 h-4 text-slate-400 group-hover/link:text-emerald-600 shrink-0 mt-1" />
+                    </div>
                   </a>
                 ))}
               </div>
@@ -297,15 +335,34 @@ export function UserDashboard() {
               </div>
               <h3 className="text-lg font-bold text-slate-900 mb-2">Bank Soal</h3>
               <div className="space-y-3 mt-4">
-                {resources.filter(r => r.category === 'bank_soal').map((item) => (
+                {resources.filter(r => r.category === 'bank_soal').length === 0 ? (
+                  <div className="text-sm text-slate-500 text-center py-4">Belum ada bank soal</div>
+                ) : resources.filter(r => r.category === 'bank_soal').map((item) => (
                   <a 
                     key={item.id} 
                     href={item.url || '#'} 
                     onClick={(e) => handleDownloadClick(e, item.url)}
-                    className="flex items-center justify-between p-3 rounded-xl bg-white hover:bg-amber-50 border border-slate-100 hover:border-amber-100 transition-colors group/link shadow-sm"
+                    className="block p-4 rounded-xl bg-white hover:bg-amber-50 border border-slate-100 hover:border-amber-100 transition-colors group/link shadow-sm"
                   >
-                    <span className="font-medium text-slate-700 group-hover/link:text-amber-600 text-sm line-clamp-1 pr-2">{item.title}</span>
-                    <Download className="w-4 h-4 text-slate-400 group-hover/link:text-amber-600 shrink-0" />
+                    <div className="flex gap-3">
+                      <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
+                        <img 
+                          src={item.imageUrl || `https://api.dicebear.com/7.x/shapes/svg?seed=${item.title}`} 
+                          alt={item.title} 
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-bold text-slate-800 group-hover/link:text-amber-600 text-sm block mb-1 truncate">{item.title}</span>
+                        <div className="text-xs text-slate-500 space-y-0.5">
+                          {item.contributor && <div className="truncate"><span className="font-medium">Oleh:</span> {item.contributor}</div>}
+                          {item.phase && <div className="truncate"><span className="font-medium">Fase:</span> {item.phase}</div>}
+                          {item.class && <div className="truncate"><span className="font-medium">Kelas:</span> {item.class}</div>}
+                        </div>
+                      </div>
+                      <Download className="w-4 h-4 text-slate-400 group-hover/link:text-amber-600 shrink-0 mt-1" />
+                    </div>
                   </a>
                 ))}
               </div>

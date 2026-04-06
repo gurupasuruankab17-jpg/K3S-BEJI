@@ -19,6 +19,23 @@ export async function getResources() {
   return data as ResourceItem[];
 }
 
+export async function createResource(resource: Partial<ResourceItem>) {
+  const { data, error } = await supabase.from('resources').insert(resource).select().single();
+  if (error) throw error;
+  return data as ResourceItem;
+}
+
+export async function updateResource(id: string, updates: Partial<ResourceItem>) {
+  const { data, error } = await supabase.from('resources').update(updates).eq('id', id).select().single();
+  if (error) throw error;
+  return data as ResourceItem;
+}
+
+export async function deleteResource(id: string) {
+  const { error } = await supabase.from('resources').delete().eq('id', id);
+  if (error) throw error;
+}
+
 export async function getUserReports(userId?: string) {
   if (!userId) return [];
   const { data, error } = await supabase.from('user_reports').select('*').eq('user_id', userId);

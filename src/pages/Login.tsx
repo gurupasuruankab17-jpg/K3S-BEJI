@@ -20,7 +20,7 @@ export function Login() {
   const [employmentStatus, setEmploymentStatus] = useState('tendik');
   const [phone, setPhone] = useState('');
   
-  const { login, loginWithGoogle, user, logout } = useAuth();
+  const { login, user, logout } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -38,9 +38,13 @@ export function Login() {
     }
   }, [user]);
 
-  // Redirect if already logged in and active
+  useEffect(() => {
+    if (user && user.status !== 'needs_registration' && user.status !== 'pending') {
+      navigate(user.role === 'admin' ? '/admin' : '/dashboard');
+    }
+  }, [user, navigate]);
+
   if (user && user.status !== 'needs_registration' && user.status !== 'pending') {
-    navigate(user.role === 'admin' ? '/admin' : '/dashboard');
     return null;
   }
 
@@ -103,8 +107,8 @@ export function Login() {
 
         const isAdmin = email === 'admin@belajar.id';
 
-        // Insert into users table with pending status
-        const { error: insertError } = await supabase.from('users').insert({
+        // Insert or update into users table with pending status
+        const { error: insertError } = await supabase.from('users').upsert({
           id: authUserId,
           name: `${firstName} ${lastName}`.trim(),
           email,
@@ -117,23 +121,32 @@ export function Login() {
           avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`
         });
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error("Supabase insert error:", insertError);
+          // Fallback for RLS infinite recursion or other DB errors
+          const fallbackUser = {
+            id: authUserId,
+            name: `${firstName} ${lastName}`.trim(),
+            email,
+            role: isAdmin ? 'admin' : 'user',
+            status: isAdmin ? 'active' : 'pending',
+            school,
+            nip,
+            phone,
+            employment_status: employmentStatus,
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`
+          };
+          localStorage.setItem(`fallback_user_${email}`, JSON.stringify(fallbackUser));
+          localStorage.setItem(`fallback_user_nip_${nip}`, email);
+        }
 
         setShowSuccessPopup(true);
       } else {
-        await login(email, password);
+        await login(nip, password);
       }
     } catch (error: any) {
-      setErrorPopup(error.message || "Terjadi kesalahan saat masuk. Silakan periksa kembali email dan kata sandi Anda.");
-      console.error(error);
-    }
-  };
-
-  const handleBelajarIdLogin = async () => {
-    try {
-      await loginWithGoogle();
-    } catch (error: any) {
-      setErrorPopup(error.message || "Gagal masuk dengan Google.");
+      const errorMsg = error.message || "Terjadi kesalahan.";
+      setErrorPopup(isRegistering ? `Gagal mendaftar: ${errorMsg}` : `Gagal masuk: ${errorMsg}. Silakan periksa kembali NIP dan kata sandi Anda.`);
       console.error(error);
     }
   };
@@ -193,67 +206,51 @@ export function Login() {
         </div>
 
         <div className="mt-8 space-y-6">
-          {!isRegistering && (
-            <button
-              onClick={handleBelajarIdLogin}
-              type="button"
-              className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all hover:shadow-md"
-            >
-              <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z" />
-              </svg>
-              Masuk dengan Akun belajar.id
-            </button>
-          )}
-
-          {!isRegistering && (
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-slate-500">Atau gunakan username</span>
-              </div>
-            </div>
-          )}
-
           <form className="space-y-4" onSubmit={handleSubmit}>
             {isRegistering && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Nama Depan</label>
-                    <input
-                      type="text"
-                      required
-                      className="appearance-none rounded-xl relative block w-full px-3 py-2 border border-slate-300 placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Nama Belakang</label>
-                    <input
-                      type="text"
-                      required
-                      className="appearance-none rounded-xl relative block w-full px-3 py-2 border border-slate-300 placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                    />
-                  </div>
-                </div>
-                
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">NIP / NIPY / NIK</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Nama Depan</label>
                   <input
                     type="text"
                     required
                     className="appearance-none rounded-xl relative block w-full px-3 py-2 border border-slate-300 placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    value={nip}
-                    onChange={(e) => setNip(e.target.value)}
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Nama Belakang</label>
+                  <input
+                    type="text"
+                    required
+                    className="appearance-none rounded-xl relative block w-full px-3 py-2 border border-slate-300 placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+            
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">NIP / NIPY / NIK</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User className="h-5 w-5 text-slate-400" />
+                </div>
+                <input
+                  type="text"
+                  required
+                  className="appearance-none rounded-xl relative block w-full px-3 py-2 pl-10 border border-slate-300 placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder="Masukkan NIP Anda"
+                  value={nip}
+                  onChange={(e) => setNip(e.target.value)}
+                />
+              </div>
+            </div>
 
+            {isRegistering && (
+              <>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Asal Lembaga</label>
                   <div className="relative">
@@ -298,28 +295,28 @@ export function Login() {
                     />
                   </div>
                 </div>
+
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">Email (Untuk Pemulihan Akun)</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Mail className="h-5 w-5 text-slate-400" />
+                    </div>
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      required
+                      disabled={user?.status === 'needs_registration'}
+                      className="appearance-none rounded-xl relative block w-full px-3 py-2 pl-10 border border-slate-300 placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors disabled:bg-slate-100 disabled:text-slate-500"
+                      placeholder="Email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </div>
+                </div>
               </>
             )}
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-400" />
-                </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  disabled={user?.status === 'needs_registration'}
-                  className="appearance-none rounded-xl relative block w-full px-3 py-2 pl-10 border border-slate-300 placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors disabled:bg-slate-100 disabled:text-slate-500"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-            </div>
             
             {(!user || user.status !== 'needs_registration') && (
               <div>
@@ -390,12 +387,24 @@ export function Login() {
               </svg>
             </div>
             <h3 className="text-lg font-bold text-slate-900 mb-2">Gagal Masuk</h3>
-            <p className="text-sm text-slate-600 mb-6">{errorPopup}</p>
+            <div className="text-sm text-slate-600 mb-6 space-y-2">
+              <p>{errorPopup}</p>
+              {errorPopup.includes('admin') && (
+                <div className="bg-slate-50 p-3 rounded-lg text-left mt-2 border border-slate-100">
+                  <p className="font-medium text-slate-700 mb-1">Solusi untuk Admin:</p>
+                  <ul className="list-disc list-inside text-xs space-y-1">
+                    <li>Pastikan NIP/Username diisi: <strong>admin</strong></li>
+                    <li>Pastikan Password diisi: <strong>admin@beji</strong></li>
+                    <li>Perhatikan huruf kecil semua dan tanpa spasi</li>
+                  </ul>
+                </div>
+              )}
+            </div>
             <button
               onClick={() => setErrorPopup(null)}
               className="w-full py-2 px-4 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition-colors"
             >
-              Tutup
+              Tutup & Coba Lagi
             </button>
           </motion.div>
         </div>

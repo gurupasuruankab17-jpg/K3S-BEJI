@@ -3,7 +3,7 @@ import { useAuth } from '../store/auth';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Plus, Edit2, Trash2, Users, FileText, Settings, Search, Calendar, X, CheckCircle2, XCircle, Download, Eye, Save, Building, Mail, Phone, User, Award, BookOpen, BarChart3, UserPlus } from 'lucide-react';
-import { getEvents, createEvent, updateEvent, deleteEvent, getResources, getAllUserReports } from '../lib/api';
+import { getEvents, createEvent, updateEvent, deleteEvent, getResources, createResource, updateResource, deleteResource, getAllUserReports } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { Event, ResourceItem, UserReport } from '../types';
 
@@ -18,6 +18,8 @@ export function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'events' | 'users' | 'reports' | 'settings' | 'resources' | 'statistics'>('events');
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
+  const [editingResource, setEditingResource] = useState<Partial<ResourceItem> | null>(null);
+  const [isResourceModalOpen, setIsResourceModalOpen] = useState(false);
 
   // Settings State
   const [settings, setSettings] = useState({
@@ -105,6 +107,38 @@ export function AdminDashboard() {
       const originalEvent = events.find(ev => ev.id === id);
       if (originalEvent) {
         setEvents(events.map(ev => ev.id === id ? { ...ev, [field]: originalEvent[field] } : ev));
+      }
+    }
+  };
+
+  const handleSaveResource = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingResource) return;
+    
+    try {
+      if (editingResource.id) {
+        const updated = await updateResource(editingResource.id, editingResource);
+        setResources(resources.map(r => r.id === updated.id ? updated : r));
+      } else {
+        const created = await createResource(editingResource);
+        setResources([created, ...resources]);
+      }
+      setIsResourceModalOpen(false);
+      setEditingResource(null);
+    } catch (error) {
+      console.error('Error saving resource:', error);
+      alert('Gagal menyimpan perangkat pembelajaran');
+    }
+  };
+
+  const handleDeleteResource = async (id: string) => {
+    if (window.confirm('Apakah Anda yakin ingin menghapus perangkat pembelajaran ini?')) {
+      try {
+        await deleteResource(id);
+        setResources(resources.filter(r => r.id !== id));
+      } catch (error) {
+        console.error('Error deleting resource:', error);
+        alert('Gagal menghapus perangkat pembelajaran');
       }
     }
   };
@@ -534,96 +568,99 @@ export function AdminDashboard() {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                 <div>
                   <h2 className="text-2xl font-bold text-slate-900">Perangkat Pembelajaran</h2>
-                  <p className="text-slate-500 mt-1">Kelola tautan unduhan modul ajar, modul kokurikuler, dan bank soal</p>
+                  <p className="text-slate-500 mt-1">Kelola modul ajar, modul kokurikuler, dan bank soal</p>
                 </div>
                 <button 
-                  onClick={handleSaveResources}
+                  onClick={() => {
+                    setEditingResource({ category: 'modul_ajar', title: '', url: '', contributor: '', phase: '', class: '' });
+                    setIsResourceModalOpen(true);
+                  }}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-medium transition-all shadow-sm flex items-center space-x-2 shrink-0"
                 >
-                  <Save className="w-5 h-5" />
-                  <span>Simpan Perubahan</span>
+                  <Plus className="w-5 h-5" />
+                  <span>Tambah Perangkat</span>
                 </button>
               </div>
 
               <div className="space-y-10">
-                {/* Modul Ajar */}
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center">
-                    <BookOpen className="w-5 h-5 mr-2 text-blue-600" /> Modul Ajar (Fase A - C)
-                  </h3>
-                  <div className="grid gap-4">
-                    {resources.filter(r => r.category === 'modul_ajar').map(item => (
-                      <div key={item.id} className="flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                        <div className="sm:w-1/3 font-semibold text-slate-700">{item.title}</div>
-                        <div className="sm:w-2/3">
-                          <input 
-                            type="url" 
-                            value={item.url}
-                            onChange={(e) => {
-                              const newResources = resources.map(r => r.id === item.id ? { ...r, url: e.target.value } : r);
-                              setResources(newResources);
-                            }}
-                            placeholder="https://drive.google.com/..."
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
-                          />
+                {[
+                  { id: 'modul_ajar', label: 'Modul Ajar (Fase A - C)', icon: <BookOpen className="w-5 h-5 mr-2 text-blue-600" />, color: 'blue' },
+                  { id: 'modul_kokurikuler', label: 'Modul Kokurikuler (P5)', icon: <BookOpen className="w-5 h-5 mr-2 text-emerald-600" />, color: 'emerald' },
+                  { id: 'bank_soal', label: 'Bank Soal & Evaluasi', icon: <BookOpen className="w-5 h-5 mr-2 text-amber-600" />, color: 'amber' }
+                ].map(category => (
+                  <div key={category.id}>
+                    <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+                      <h3 className="text-lg font-bold text-slate-900 flex items-center">
+                        {category.icon} {category.label}
+                      </h3>
+                      <button 
+                        onClick={() => {
+                          setEditingResource({ category: category.id as any, title: '', url: '', contributor: '', phase: '', class: '' });
+                          setIsResourceModalOpen(true);
+                        }}
+                        className={`text-sm font-medium text-${category.color}-600 hover:text-${category.color}-700 flex items-center`}
+                      >
+                        <Plus className="w-4 h-4 mr-1" /> Tambah
+                      </button>
+                    </div>
+                    
+                    <div className="grid gap-4">
+                      {resources.filter(r => r.category === category.id).length === 0 ? (
+                        <div className="text-center py-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-500">
+                          Belum ada data
                         </div>
-                      </div>
-                    ))}
+                      ) : (
+                        resources.filter(r => r.category === category.id).map(item => (
+                          <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                            <div className="flex items-start sm:items-center gap-4 flex-1">
+                              <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-slate-200 border border-slate-200">
+                                <img 
+                                  src={item.imageUrl || `https://api.dicebear.com/7.x/shapes/svg?seed=${item.title}`} 
+                                  alt={item.title} 
+                                  className="w-full h-full object-cover"
+                                  referrerPolicy="no-referrer"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/shapes/svg?seed=${item.title}`;
+                                  }}
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-bold text-slate-800 truncate">{item.title}</h4>
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-slate-500">
+                                  {item.contributor && <span><span className="font-medium text-slate-600">Kontributor:</span> {item.contributor}</span>}
+                                  {item.phase && <span><span className="font-medium text-slate-600">Fase:</span> {item.phase}</span>}
+                                  {item.class && <span><span className="font-medium text-slate-600">Kelas:</span> {item.class}</span>}
+                                </div>
+                                <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline mt-1 inline-block truncate max-w-full">
+                                  {item.url}
+                                </a>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2 shrink-0 self-end sm:self-auto">
+                              <button 
+                                onClick={() => {
+                                  setEditingResource(item);
+                                  setIsResourceModalOpen(true);
+                                }}
+                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                title="Edit"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteResource(item.id)}
+                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Hapus"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
-                </div>
-
-                {/* Modul Kokurikuler */}
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center">
-                    <BookOpen className="w-5 h-5 mr-2 text-emerald-600" /> Modul Kokurikuler (P5)
-                  </h3>
-                  <div className="grid gap-4">
-                    {resources.filter(r => r.category === 'modul_kokurikuler').map(item => (
-                      <div key={item.id} className="flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                        <div className="sm:w-1/3 font-semibold text-slate-700">{item.title}</div>
-                        <div className="sm:w-2/3">
-                          <input 
-                            type="url" 
-                            value={item.url}
-                            onChange={(e) => {
-                              const newResources = resources.map(r => r.id === item.id ? { ...r, url: e.target.value } : r);
-                              setResources(newResources);
-                            }}
-                            placeholder="https://drive.google.com/..."
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm bg-white"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Bank Soal */}
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center">
-                    <BookOpen className="w-5 h-5 mr-2 text-amber-600" /> Bank Soal & Evaluasi
-                  </h3>
-                  <div className="grid gap-4">
-                    {resources.filter(r => r.category === 'bank_soal').map(item => (
-                      <div key={item.id} className="flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                        <div className="sm:w-1/3 font-semibold text-slate-700">{item.title}</div>
-                        <div className="sm:w-2/3">
-                          <input 
-                            type="url" 
-                            value={item.url}
-                            onChange={(e) => {
-                              const newResources = resources.map(r => r.id === item.id ? { ...r, url: e.target.value } : r);
-                              setResources(newResources);
-                            }}
-                            placeholder="https://drive.google.com/..."
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm bg-white"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
+                ))}
               </div>
             </motion.div>
           )}
@@ -877,6 +914,24 @@ export function AdminDashboard() {
                       />
                     </div>
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">URL Gambar (Opsional)</label>
+                    <input 
+                      type="url" 
+                      value={editingEvent.image || ''}
+                      onChange={e => setEditingEvent({...editingEvent, image: e.target.value})}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+                      placeholder="https://..."
+                    />
+                    {editingEvent.image && (
+                      <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 h-40 bg-slate-100 relative">
+                        <img src={editingEvent.image} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={(e) => {
+                          (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/shapes/svg?seed=${editingEvent.title}`;
+                        }} />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Section 2: Tautan LMS */}
@@ -939,6 +994,42 @@ export function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* Section 3: Statistik (Hanya untuk kegiatan selesai) */}
+                {editingEvent.status === 'completed' && (
+                  <div className="space-y-5 pt-6 border-t border-slate-100">
+                    <h4 className="text-sm font-bold text-emerald-600 uppercase tracking-wider flex items-center">
+                      <BarChart3 className="w-4 h-4 mr-2" /> Statistik Umpan Balik
+                    </h4>
+                    
+                    <div className="grid sm:grid-cols-2 gap-6 bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Tingkat Kehadiran (%)</label>
+                        <input 
+                          type="number" 
+                          min="0"
+                          max="100"
+                          value={editingEvent.attendanceRate || ''}
+                          onChange={e => setEditingEvent({...editingEvent, attendanceRate: Number(e.target.value)})}
+                          placeholder="0 - 100"
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Kepuasan Peserta (%)</label>
+                        <input 
+                          type="number" 
+                          min="0"
+                          max="100"
+                          value={editingEvent.satisfactionRate || ''}
+                          onChange={e => setEditingEvent({...editingEvent, satisfactionRate: Number(e.target.value)})}
+                          placeholder="0 - 100"
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
               </form>
             </div>
 
@@ -960,6 +1051,140 @@ export function AdminDashboard() {
               >
                 <Save className="w-4 h-4 mr-2" />
                 Simpan Kegiatan
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Resource Modal */}
+      {isResourceModalOpen && editingResource && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex justify-between items-center shrink-0">
+              <h3 className="text-xl font-bold text-slate-900">
+                {editingResource.id ? 'Edit Perangkat Pembelajaran' : 'Tambah Perangkat Pembelajaran'}
+              </h3>
+              <button 
+                onClick={() => {
+                  setEditingResource(null);
+                  setIsResourceModalOpen(false);
+                }}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto">
+              <form id="resource-form" onSubmit={handleSaveResource} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Kategori</label>
+                  <select 
+                    value={editingResource.category || 'modul_ajar'}
+                    onChange={e => setEditingResource({...editingResource, category: e.target.value as any})}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    required
+                  >
+                    <option value="modul_ajar">Modul Ajar (Fase A - C)</option>
+                    <option value="modul_kokurikuler">Modul Kokurikuler (P5)</option>
+                    <option value="bank_soal">Bank Soal & Evaluasi</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Nama Modul / Bank Soal</label>
+                  <input 
+                    type="text" 
+                    value={editingResource.title || ''}
+                    onChange={e => setEditingResource({...editingResource, title: e.target.value})}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Nama (Kontributor)</label>
+                  <input 
+                    type="text" 
+                    value={editingResource.contributor || ''}
+                    onChange={e => setEditingResource({...editingResource, contributor: e.target.value})}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Fase</label>
+                    <input 
+                      type="text" 
+                      value={editingResource.phase || ''}
+                      onChange={e => setEditingResource({...editingResource, phase: e.target.value})}
+                      placeholder="Contoh: A, B, C"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Kelas</label>
+                    <input 
+                      type="text" 
+                      value={editingResource.class || ''}
+                      onChange={e => setEditingResource({...editingResource, class: e.target.value})}
+                      placeholder="Contoh: 1, 2, 3"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Link Drive / URL</label>
+                  <input 
+                    type="url" 
+                    value={editingResource.url || ''}
+                    onChange={e => setEditingResource({...editingResource, url: e.target.value})}
+                    placeholder="https://drive.google.com/..."
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">URL Gambar (Opsional)</label>
+                  <input 
+                    type="url" 
+                    value={editingResource.imageUrl || ''}
+                    onChange={e => setEditingResource({...editingResource, imageUrl: e.target.value})}
+                    placeholder="https://..."
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                  {editingResource.imageUrl && (
+                    <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 h-32 bg-slate-100 relative">
+                      <img src={editingResource.imageUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={(e) => {
+                        (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/shapes/svg?seed=${editingResource.title}`;
+                      }} />
+                    </div>
+                  )}
+                </div>
+              </form>
+            </div>
+
+            <div className="bg-slate-50 border-t border-slate-100 px-6 py-4 flex justify-end space-x-3 shrink-0">
+              <button 
+                type="button"
+                onClick={() => {
+                  setEditingResource(null);
+                  setIsResourceModalOpen(false);
+                }}
+                className="px-6 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                Batal
+              </button>
+              <button 
+                type="submit"
+                form="resource-form"
+                className="px-6 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg flex items-center"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Simpan
               </button>
             </div>
           </motion.div>

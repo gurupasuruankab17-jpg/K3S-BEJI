@@ -129,6 +129,9 @@ export interface ResourceItem {
   category: 'modul_ajar' | 'modul_kokurikuler' | 'bank_soal';
   title: string;
   url: string;
+  contributor?: string;
+  phase?: string;
+  class?: string;
 }
 
 export let mockResources: ResourceItem[] = [
