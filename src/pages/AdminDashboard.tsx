@@ -2,24 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../store/auth';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Plus, Edit2, Trash2, Users, FileText, Settings, Search, Calendar, X, CheckCircle2, XCircle, Download, Eye, Save, Building, Mail, Phone, User, Award, BookOpen, BarChart3, UserPlus } from 'lucide-react';
-import { getEvents, createEvent, updateEvent, deleteEvent, getResources, createResource, updateResource, deleteResource, getAllUserReports } from '../lib/api';
+import { Plus, Edit2, Trash2, Users, FileText, Settings, Search, Calendar, X, CheckCircle2, XCircle, Download, Eye, Save, Building, Mail, Phone, User, Award, BookOpen, BarChart3, UserPlus, Newspaper } from 'lucide-react';
+import { getEvents, createEvent, updateEvent, deleteEvent, getResources, createResource, updateResource, deleteResource, getAllUserReports, getArticles, createArticle, updateArticle, deleteArticle } from '../lib/api';
 import { supabase } from '../lib/supabase';
-import { Event, ResourceItem, UserReport } from '../types';
+import { Event, ResourceItem, UserReport, Article } from '../types';
 
 export function AdminDashboard() {
   const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [articles, setArticles] = useState<Article[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [allReports, setAllReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const [activeTab, setActiveTab] = useState<'events' | 'users' | 'reports' | 'settings' | 'resources' | 'statistics'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'users' | 'reports' | 'settings' | 'resources' | 'statistics' | 'articles'>('events');
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [editingResource, setEditingResource] = useState<Partial<ResourceItem> | null>(null);
   const [isResourceModalOpen, setIsResourceModalOpen] = useState(false);
+  const [editingArticle, setEditingArticle] = useState<Partial<Article> | null>(null);
+  const [isArticleModalOpen, setIsArticleModalOpen] = useState(false);
 
   // Settings State
   const [settings, setSettings] = useState({
@@ -33,15 +36,17 @@ export function AdminDashboard() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [eventsData, resourcesData, reportsData, { data: usersData }] = await Promise.all([
+        const [eventsData, resourcesData, reportsData, articlesData, { data: usersData }] = await Promise.all([
           getEvents(),
           getResources(),
           getAllUserReports(),
+          getArticles(),
           supabase.from('users').select('*')
         ]);
         setEvents(eventsData);
         setResources(resourcesData);
         setAllReports(reportsData || []);
+        setArticles(articlesData || []);
         setAllUsers(usersData || []);
       } catch (error) {
         console.error('Error fetching admin data:', error);
@@ -241,6 +246,13 @@ export function AdminDashboard() {
                 >
                   <BarChart3 className={`w-5 h-5 ${activeTab === 'statistics' ? 'text-blue-600' : 'text-slate-400'}`} />
                   <span className="text-left leading-tight">Statistik & Umpan Balik</span>
+                </button>
+                <button 
+                  onClick={() => setActiveTab('articles')}
+                  className={`w-full flex items-center space-x-3 px-4 py-3.5 rounded-2xl transition-all ${activeTab === 'articles' ? 'bg-blue-50 text-blue-700 font-semibold shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+                >
+                  <Newspaper className={`w-5 h-5 ${activeTab === 'articles' ? 'text-blue-600' : 'text-slate-400'}`} />
+                  <span className="text-left leading-tight">Berita & Artikel</span>
                 </button>
                 <button 
                   onClick={() => setActiveTab('settings')}
@@ -729,6 +741,90 @@ export function AdminDashboard() {
             </motion.div>
           )}
 
+          {activeTab === 'articles' && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-8"
+            >
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Kelola Berita & Artikel</h2>
+                  <p className="text-slate-500 mt-1">Publikasikan informasi terbaru ke halaman publik</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setEditingArticle({ title: '', content: '', status: 'published', image_url: '' });
+                    setIsArticleModalOpen(true);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-sm hover:shadow-md flex items-center space-x-2 shrink-0"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>Tulis Artikel Baru</span>
+                </button>
+              </div>
+
+              <div className="grid gap-4">
+                {articles.length === 0 ? (
+                  <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-200 border-dashed">
+                    <Newspaper className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <h3 className="text-lg font-medium text-slate-900">Belum ada artikel</h3>
+                    <p className="text-slate-500">Mulai tulis artikel pertama Anda untuk dibagikan ke publik.</p>
+                  </div>
+                ) : (
+                  articles.map(article => (
+                    <div key={article.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                      <div className="flex items-start sm:items-center gap-4 flex-1">
+                        {article.image_url && (
+                          <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-slate-200 border border-slate-200">
+                            <img src={article.image_url} alt={article.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-slate-800 truncate">{article.title}</h4>
+                          <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
+                            <span>{new Date(article.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${article.status === 'published' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                              {article.status === 'published' ? 'Dipublikasikan' : 'Draf'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 shrink-0 self-end sm:self-auto">
+                        <button 
+                          onClick={() => {
+                            setEditingArticle(article);
+                            setIsArticleModalOpen(true);
+                          }}
+                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Edit"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            if (window.confirm('Apakah Anda yakin ingin menghapus artikel ini?')) {
+                              try {
+                                await deleteArticle(article.id);
+                                setArticles(articles.filter(a => a.id !== article.id));
+                              } catch (error: any) {
+                                alert(`Gagal menghapus artikel: ${error.message}`);
+                              }
+                            }
+                          }}
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Hapus"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          )}
+
           {activeTab === 'settings' && (
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
@@ -1185,6 +1281,191 @@ export function AdminDashboard() {
               >
                 <Save className="w-4 h-4 mr-2" />
                 Simpan
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+      {/* Article Modal */}
+      {isArticleModalOpen && editingArticle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm overflow-y-auto">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex justify-between items-center shrink-0">
+              <h3 className="text-xl font-bold text-slate-800 flex items-center">
+                <Newspaper className="w-5 h-5 mr-2 text-blue-600" />
+                {editingArticle.id ? 'Edit Artikel' : 'Tulis Artikel Baru'}
+              </h3>
+              <button 
+                onClick={() => {
+                  setEditingArticle(null);
+                  setIsArticleModalOpen(false);
+                }}
+                className="p-2 hover:bg-slate-200 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1">
+              <form id="article-form" onSubmit={async (e) => {
+                e.preventDefault();
+                try {
+                  if (editingArticle.id) {
+                    const updated = await updateArticle(editingArticle.id, {
+                      ...editingArticle,
+                      updated_at: new Date().toISOString()
+                    });
+                    setArticles(articles.map(a => a.id === updated.id ? updated : a));
+                    alert('Artikel berhasil diperbarui!');
+                  } else {
+                    const created = await createArticle({
+                      ...editingArticle,
+                      author_id: user.id
+                    });
+                    setArticles([created, ...articles]);
+                    alert('Artikel berhasil dipublikasikan!');
+                  }
+                  setIsArticleModalOpen(false);
+                  setEditingArticle(null);
+                } catch (error: any) {
+                  alert(`Gagal menyimpan artikel: ${error.message}`);
+                }
+              }} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Judul Artikel</label>
+                  <input 
+                    type="text" 
+                    value={editingArticle.title || ''}
+                    onChange={e => setEditingArticle({...editingArticle, title: e.target.value})}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-medium"
+                    placeholder="Masukkan judul artikel..."
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">URL Gambar (lh3 / Opsional)</label>
+                  <input 
+                    type="url" 
+                    value={editingArticle.image_url || ''}
+                    onChange={e => setEditingArticle({...editingArticle, image_url: e.target.value})}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    placeholder="https://lh3.googleusercontent.com/..."
+                  />
+                  {editingArticle.image_url && (
+                    <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 h-48 bg-slate-100 relative">
+                      <img src={editingArticle.image_url} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Konten Artikel</label>
+                  <div className="border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
+                    <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 flex flex-wrap gap-2 items-center">
+                      <button type="button" onClick={() => {
+                        const textarea = document.getElementById('article-content') as HTMLTextAreaElement;
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const text = editingArticle.content || '';
+                        setEditingArticle({...editingArticle, content: text.substring(0, start) + '# ' + text.substring(start, end) + text.substring(end)});
+                      }} className="px-2 py-1 text-sm font-bold text-slate-700 hover:bg-slate-200 rounded">H1</button>
+                      <button type="button" onClick={() => {
+                        const textarea = document.getElementById('article-content') as HTMLTextAreaElement;
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const text = editingArticle.content || '';
+                        setEditingArticle({...editingArticle, content: text.substring(0, start) + '## ' + text.substring(start, end) + text.substring(end)});
+                      }} className="px-2 py-1 text-sm font-bold text-slate-700 hover:bg-slate-200 rounded">H2</button>
+                      <button type="button" onClick={() => {
+                        const textarea = document.getElementById('article-content') as HTMLTextAreaElement;
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const text = editingArticle.content || '';
+                        setEditingArticle({...editingArticle, content: text.substring(0, start) + '### ' + text.substring(start, end) + text.substring(end)});
+                      }} className="px-2 py-1 text-sm font-bold text-slate-700 hover:bg-slate-200 rounded">H3</button>
+                      <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                      <button type="button" onClick={() => {
+                        const textarea = document.getElementById('article-content') as HTMLTextAreaElement;
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const text = editingArticle.content || '';
+                        setEditingArticle({...editingArticle, content: text.substring(0, start) + '**' + text.substring(start, end) + '**' + text.substring(end)});
+                      }} className="px-2 py-1 text-sm font-bold text-slate-700 hover:bg-slate-200 rounded">B</button>
+                      <button type="button" onClick={() => {
+                        const textarea = document.getElementById('article-content') as HTMLTextAreaElement;
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const text = editingArticle.content || '';
+                        setEditingArticle({...editingArticle, content: text.substring(0, start) + '*' + text.substring(start, end) + '*' + text.substring(end)});
+                      }} className="px-2 py-1 text-sm italic text-slate-700 hover:bg-slate-200 rounded">I</button>
+                      <button type="button" onClick={() => {
+                        const textarea = document.getElementById('article-content') as HTMLTextAreaElement;
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const text = editingArticle.content || '';
+                        setEditingArticle({...editingArticle, content: text.substring(0, start) + '<u>' + text.substring(start, end) + '</u>' + text.substring(end)});
+                      }} className="px-2 py-1 text-sm underline text-slate-700 hover:bg-slate-200 rounded">U</button>
+                      <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                      <button type="button" onClick={() => {
+                        const textarea = document.getElementById('article-content') as HTMLTextAreaElement;
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const text = editingArticle.content || '';
+                        setEditingArticle({...editingArticle, content: text.substring(0, start) + '<div align="left">' + text.substring(start, end) + '</div>' + text.substring(end)});
+                      }} className="px-2 py-1 text-sm text-slate-700 hover:bg-slate-200 rounded">Kiri</button>
+                      <button type="button" onClick={() => {
+                        const textarea = document.getElementById('article-content') as HTMLTextAreaElement;
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const text = editingArticle.content || '';
+                        setEditingArticle({...editingArticle, content: text.substring(0, start) + '<div align="right">' + text.substring(start, end) + '</div>' + text.substring(end)});
+                      }} className="px-2 py-1 text-sm text-slate-700 hover:bg-slate-200 rounded">Kanan</button>
+                    </div>
+                    <textarea 
+                      id="article-content"
+                      value={editingArticle.content || ''}
+                      onChange={e => setEditingArticle({...editingArticle, content: e.target.value})}
+                      className="w-full px-4 py-3 min-h-[300px] focus:outline-none text-sm resize-y"
+                      placeholder="Tulis konten artikel di sini (mendukung Markdown dan HTML dasar)..."
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Status Publikasi</label>
+                  <select 
+                    value={editingArticle.status || 'published'}
+                    onChange={e => setEditingArticle({...editingArticle, status: e.target.value as 'draft' | 'published'})}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  >
+                    <option value="published">Publikasikan Langsung</option>
+                    <option value="draft">Simpan sebagai Draf</option>
+                  </select>
+                </div>
+              </form>
+            </div>
+
+            <div className="bg-slate-50 border-t border-slate-100 px-6 py-4 flex justify-end space-x-3 shrink-0">
+              <button 
+                type="button"
+                onClick={() => {
+                  setEditingArticle(null);
+                  setIsArticleModalOpen(false);
+                }}
+                className="px-6 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                Batal
+              </button>
+              <button 
+                type="submit"
+                form="article-form"
+                className="px-6 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg flex items-center"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Simpan & Publikasikan
               </button>
             </div>
           </motion.div>

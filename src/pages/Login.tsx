@@ -12,6 +12,15 @@ export function Login() {
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [errorPopup, setErrorPopup] = useState<string | null>(null);
   
+  // Forgot Password fields
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [showNewPasswordPopup, setShowNewPasswordPopup] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  
   // Registration fields
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -148,6 +157,47 @@ export function Login() {
       const errorMsg = error.message || "Terjadi kesalahan.";
       setErrorPopup(isRegistering ? `Gagal mendaftar: ${errorMsg}` : `Gagal masuk: ${errorMsg}. Silakan periksa kembali NIP dan kata sandi Anda.`);
       console.error(error);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ email: forgotEmail });
+      if (error) throw error;
+      setOtpSent(true);
+      alert('Kode pemulihan telah dikirim ke email Anda. Silakan periksa kotak masuk atau folder spam.');
+    } catch (error: any) {
+      setErrorPopup(`Gagal mengirim kode: ${error.message}`);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const { error } = await supabase.auth.verifyOtp({ email: forgotEmail, token: otpCode, type: 'email' });
+      if (error) throw error;
+      setShowNewPasswordPopup(true);
+    } catch (error: any) {
+      setErrorPopup(`Kode tidak valid: ${error.message}`);
+    }
+  };
+
+  const handleSetNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmNewPassword) {
+      setErrorPopup('Kata sandi baru dan konfirmasi tidak cocok.');
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      alert('Kata sandi berhasil diperbarui! Anda sekarang masuk dengan kata sandi baru.');
+      setShowNewPasswordPopup(false);
+      setIsForgotPassword(false);
+      // User is already logged in via OTP, so they will be redirected by the useEffect
+    } catch (error: any) {
+      setErrorPopup(`Gagal memperbarui kata sandi: ${error.message}`);
     }
   };
 
@@ -336,6 +386,17 @@ export function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
+                {!isRegistering && (
+                  <div className="mt-2 text-right">
+                    <button
+                      type="button"
+                      onClick={() => setIsForgotPassword(true)}
+                      className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Lupa Password?
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -386,7 +447,7 @@ export function Login() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Gagal Masuk</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Terjadi Kesalahan</h3>
             <div className="text-sm text-slate-600 mb-6 space-y-2">
               <p>{errorPopup}</p>
               {errorPopup.includes('admin') && (
@@ -406,6 +467,140 @@ export function Login() {
             >
               Tutup & Coba Lagi
             </button>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Forgot Password Modal */}
+      {isForgotPassword && !showNewPasswordPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-3xl p-8 max-w-md w-full shadow-xl"
+          >
+            <h3 className="text-2xl font-bold text-slate-900 mb-2">Lupa Password</h3>
+            <p className="text-slate-600 mb-6 text-sm">
+              {otpSent 
+                ? "Masukkan kode 6 digit yang telah dikirimkan ke email Anda." 
+                : "Masukkan alamat email yang terdaftar. Kami akan mengirimkan kode pemulihan."}
+            </p>
+
+            {!otpSent ? (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div>
+                  <label htmlFor="forgotEmail" className="block text-sm font-medium text-slate-700 mb-1">Email Terdaftar</label>
+                  <input
+                    id="forgotEmail"
+                    type="email"
+                    required
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    placeholder="nama@email.com"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsForgotPassword(false)}
+                    className="flex-1 py-3 px-4 border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors shadow-sm"
+                  >
+                    Kirim Kode
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyOtp} className="space-y-4">
+                <div>
+                  <label htmlFor="otpCode" className="block text-sm font-medium text-slate-700 mb-1">Kode Pemulihan (6 Digit)</label>
+                  <input
+                    id="otpCode"
+                    type="text"
+                    required
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-center text-2xl tracking-widest"
+                    placeholder="000000"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setOtpSent(false)}
+                    className="flex-1 py-3 px-4 border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-colors"
+                  >
+                    Kembali
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors shadow-sm"
+                  >
+                    Verifikasi
+                  </button>
+                </div>
+              </form>
+            )}
+          </motion.div>
+        </div>
+      )}
+
+      {/* New Password Modal */}
+      {showNewPasswordPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-3xl p-8 max-w-md w-full shadow-xl"
+          >
+            <h3 className="text-2xl font-bold text-slate-900 mb-2">Buat Password Baru</h3>
+            <p className="text-slate-600 mb-6 text-sm">
+              Silakan masukkan password baru untuk akun Anda.
+            </p>
+
+            <form onSubmit={handleSetNewPassword} className="space-y-4">
+              <div>
+                <label htmlFor="newPassword" className="block text-sm font-medium text-slate-700 mb-1">Password Baru</label>
+                <input
+                  id="newPassword"
+                  type="password"
+                  required
+                  minLength={6}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  placeholder="Minimal 6 karakter"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+              <div>
+                <label htmlFor="confirmNewPassword" className="block text-sm font-medium text-slate-700 mb-1">Konfirmasi Password Baru</label>
+                <input
+                  id="confirmNewPassword"
+                  type="password"
+                  required
+                  minLength={6}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  placeholder="Ulangi password baru"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                />
+              </div>
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  className="w-full py-3 px-4 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors shadow-sm"
+                >
+                  Simpan Password & Masuk
+                </button>
+              </div>
+            </form>
           </motion.div>
         </div>
       )}

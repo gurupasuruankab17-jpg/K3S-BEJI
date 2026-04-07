@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, useMotionValue, useTransform, animate } from 'motion/react';
-import { BookOpen, Users, Award, Calendar, ArrowRight, CheckCircle2, BarChart3, Download, FileText, Layers, FileQuestion, Lock } from 'lucide-react';
+import { BookOpen, Users, Award, Calendar, ArrowRight, CheckCircle2, BarChart3, Download, FileText, Layers, FileQuestion, Lock, Newspaper } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useAuth } from '../store/auth';
-import { getEvents, getResources } from '../lib/api';
-import { Event, ResourceItem } from '../types';
+import { getEvents, getResources, getPublishedArticles } from '../lib/api';
+import { Event, ResourceItem, Article } from '../types';
 import { supabase } from '../lib/supabase';
 
 function AnimatedCounter({ value }: { value: number }) {
@@ -25,19 +25,23 @@ export function Home() {
   const navigate = useNavigate();
   const [events, setEvents] = useState<Event[]>([]);
   const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [articles, setArticles] = useState<Article[]>([]);
   const [totalMembers, setTotalMembers] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'home' | 'news'>('home');
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [eventsData, resourcesData, { count }] = await Promise.all([
+        const [eventsData, resourcesData, articlesData, { count }] = await Promise.all([
           getEvents(),
           getResources(),
+          getPublishedArticles(),
           supabase.from('users').select('*', { count: 'exact', head: true })
         ]);
         setEvents(eventsData);
         setResources(resourcesData);
+        setArticles(articlesData || []);
         setTotalMembers(count || 0);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -160,7 +164,81 @@ export function Home() {
         </div>
       </section>
 
-      {/* 3 Keuntungan Section */}
+      {/* Tabs */}
+      <div className="bg-white border-b border-slate-200 sticky top-16 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex space-x-8">
+            <button
+              onClick={() => setActiveTab('home')}
+              className={`py-4 px-2 font-bold text-lg border-b-4 transition-colors ${activeTab === 'home' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+            >
+              Beranda
+            </button>
+            <button
+              onClick={() => setActiveTab('news')}
+              className={`py-4 px-2 font-bold text-lg border-b-4 transition-colors flex items-center space-x-2 ${activeTab === 'news' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+            >
+              <Newspaper className="w-5 h-5" />
+              <span>Berita Terbaru</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {activeTab === 'news' ? (
+        <section className="py-20 bg-slate-50 min-h-screen">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Berita & Artikel Terbaru</h2>
+              <p className="text-lg text-slate-600 max-w-2xl mx-auto">Informasi terkini seputar kegiatan dan inovasi pendidikan di Kecamatan Beji.</p>
+            </div>
+            
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {articles.length === 0 ? (
+                <div className="col-span-full text-center py-12 bg-white rounded-3xl border border-slate-200 border-dashed">
+                  <Newspaper className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">Belum ada berita</h3>
+                  <p className="text-slate-500">Berita dan artikel terbaru akan segera hadir.</p>
+                </div>
+              ) : (
+                articles.map(article => (
+                  <motion.article 
+                    key={article.id}
+                    whileHover={{ y: -10 }}
+                    className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-slate-100 flex flex-col"
+                  >
+                    {article.image_url && (
+                      <div className="h-48 overflow-hidden bg-slate-100">
+                        <img src={article.image_url} alt={article.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      </div>
+                    )}
+                    <div className="p-6 flex-1 flex flex-col">
+                      <div className="text-sm font-medium text-blue-600 mb-3">
+                        {new Date(article.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-4 line-clamp-2">{article.title}</h3>
+                      <div className="prose prose-sm text-slate-600 line-clamp-3 mb-6" dangerouslySetInnerHTML={{ __html: article.content.substring(0, 150) + '...' }} />
+                      <div className="mt-auto pt-4 border-t border-slate-100">
+                        <button 
+                          onClick={() => {
+                            // In a real app, this would navigate to a full article page or open a modal
+                            alert('Fitur baca selengkapnya akan segera hadir!');
+                          }}
+                          className="text-blue-600 font-bold hover:text-blue-800 flex items-center transition-colors"
+                        >
+                          Baca Selengkapnya <ArrowRight className="w-4 h-4 ml-2" />
+                        </button>
+                      </div>
+                    </div>
+                  </motion.article>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
+      ) : (
+        <>
+          {/* 3 Keuntungan Section */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -438,6 +516,8 @@ export function Home() {
 
         </div>
       </section>
+      </>
+      )}
     </div>
   );
 }

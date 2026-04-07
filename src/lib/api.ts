@@ -1,5 +1,34 @@
 import { supabase } from './supabase';
-import { Event, UserReport, ResourceItem } from '../types';
+import { Event, UserReport, ResourceItem, Article } from '../types';
+
+export async function getArticles() {
+  const { data, error } = await supabase.from('articles').select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+  return data as Article[];
+}
+
+export async function getPublishedArticles() {
+  const { data, error } = await supabase.from('articles').select('*').eq('status', 'published').order('created_at', { ascending: false });
+  if (error) throw error;
+  return data as Article[];
+}
+
+export async function createArticle(article: Partial<Article>) {
+  const { data, error } = await supabase.from('articles').insert(article).select().single();
+  if (error) throw error;
+  return data as Article;
+}
+
+export async function updateArticle(id: string, updates: Partial<Article>) {
+  const { data, error } = await supabase.from('articles').update(updates).eq('id', id).select().single();
+  if (error) throw error;
+  return data as Article;
+}
+
+export async function deleteArticle(id: string) {
+  const { error } = await supabase.from('articles').delete().eq('id', id);
+  if (error) throw error;
+}
 
 export async function getEvents() {
   const { data, error } = await supabase.from('events').select('*').order('date', { ascending: false });

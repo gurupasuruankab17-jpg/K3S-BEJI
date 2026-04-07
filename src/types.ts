@@ -39,3 +39,14 @@ export interface ResourceItem {
   class?: string;
   imageUrl?: string;
 }
+
+export interface Article {
+  id: string;
+  title: string;
+  content: string;
+  author_id: string;
+  created_at: string;
+  updated_at: string;
+  status: 'draft' | 'published';
+  image_url?: string;
+}
